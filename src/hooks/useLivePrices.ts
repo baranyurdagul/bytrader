@@ -77,16 +77,16 @@ async function fetchHistoricalPrices(assetId: string, category: string, days: nu
   }
 }
 
-// Generate fallback history with realistic price ranges
+// Generate fallback history with realistic price ranges (based on actual 2024-2025 market data)
 function generateFallbackHistory(assetId: string, category: string, days: number): PricePoint[] {
   const history: PricePoint[] = [];
   const now = Date.now();
   
-  // Realistic starting prices and volatility (going back from current prices)
+  // Realistic prices based on actual market data (2024-2025)
   const configs: Record<string, { current: number; yearAgo: number; volatility: number }> = {
-    gold: { current: 4600, yearAgo: 2100, volatility: 0.01 },
-    silver: { current: 90, yearAgo: 25, volatility: 0.015 },
-    copper: { current: 0.40, yearAgo: 0.30, volatility: 0.02 },
+    gold: { current: 2650, yearAgo: 2050, volatility: 0.008 },
+    silver: { current: 31, yearAgo: 23, volatility: 0.012 },
+    copper: { current: 4.25, yearAgo: 3.85, volatility: 0.015 },
     bitcoin: { current: 95000, yearAgo: 45000, volatility: 0.04 },
     ethereum: { current: 3300, yearAgo: 2500, volatility: 0.045 },
     nasdaq100: { current: 21500, yearAgo: 17000, volatility: 0.015 },
