@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { CommodityCard } from '@/components/CommodityCard';
 import { SignalCard } from '@/components/SignalCard';
@@ -6,23 +6,56 @@ import { TrendMeter } from '@/components/TrendMeter';
 import { TechnicalIndicatorsPanel } from '@/components/TechnicalIndicators';
 import { PriceChart } from '@/components/PriceChart';
 import { SignalHistory } from '@/components/SignalHistory';
+import { AddAlertDialog } from '@/components/AddAlertDialog';
+import { AlertsList } from '@/components/AlertsList';
 import { useLivePrices } from '@/hooks/useLivePrices';
+import { usePriceAlerts } from '@/hooks/usePriceAlerts';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   getTechnicalIndicators, 
   getSignal, 
   getTrendAnalysis,
   getCommodityData 
 } from '@/lib/tradingData';
-import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff, Bell, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const { commodities: liveCommodities, isLoading, error, lastUpdated, refetch } = useLivePrices(60000);
+  const { 
+    alerts, 
+    addAlert, 
+    deleteAlert, 
+    toggleAlert, 
+    checkAlerts,
+    requestNotificationPermission,
+    activeAlertsCount 
+  } = usePriceAlerts();
   const [selectedCommodityId, setSelectedCommodityId] = useState('gold');
+  const [showAlerts, setShowAlerts] = useState(false);
   
   // Fall back to simulated data if live data is not available
   const commodities = liveCommodities.length > 0 ? liveCommodities : getCommodityData();
+
+  // Create price map for alert checking
+  const currentPrices = useMemo(() => {
+    const prices: Record<string, number> = {};
+    commodities.forEach(c => {
+      prices[c.id] = c.price;
+    });
+    return prices;
+  }, [commodities]);
+
+  // Check alerts whenever prices update
+  useEffect(() => {
+    if (isAuthenticated && Object.keys(currentPrices).length > 0) {
+      checkAlerts(currentPrices);
+    }
+  }, [currentPrices, checkAlerts, isAuthenticated]);
   
   const selectedCommodity = useMemo(() => 
     commodities.find(c => c.id === selectedCommodityId) || commodities[0],
@@ -84,17 +117,83 @@ const Index = () => {
               </>
             )}
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={refetch}
-            disabled={isLoading}
-            className="gap-2"
-          >
-            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <>
+                <Button
+                  variant={showAlerts ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowAlerts(!showAlerts)}
+                  className="gap-2"
+                >
+                  {activeAlertsCount > 0 ? (
+                    <BellRing className="w-4 h-4" />
+                  ) : (
+                    <Bell className="w-4 h-4" />
+                  )}
+                  Alerts
+                  {activeAlertsCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary-foreground text-primary">
+                      {activeAlertsCount}
+                    </span>
+                  )}
+                </Button>
+                <AddAlertDialog 
+                  commodities={commodities} 
+                  onAddAlert={addAlert}
+                  selectedAssetId={selectedCommodityId}
+                />
+              </>
+            )}
+            {!isAuthenticated && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/auth')}
+                className="gap-2"
+              >
+                <Bell className="w-4 h-4" />
+                Sign in for Alerts
+              </Button>
+            )}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={refetch}
+              disabled={isLoading}
+              className="gap-2"
+            >
+              <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+              Refresh
+            </Button>
+          </div>
         </div>
+
+        {/* Alerts Panel */}
+        {showAlerts && isAuthenticated && (
+          <div className="mb-6 p-4 rounded-xl bg-card border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                <Bell className="w-5 h-5 text-primary" />
+                Price Alerts
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={requestNotificationPermission}
+                className="text-xs"
+              >
+                Enable Browser Notifications
+              </Button>
+            </div>
+            <AlertsList
+              alerts={alerts}
+              onDelete={deleteAlert}
+              onToggle={toggleAlert}
+              currentPrices={currentPrices}
+            />
+          </div>
+        )}
 
         {/* Metals Section */}
         <section className="mb-6">

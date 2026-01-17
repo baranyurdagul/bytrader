@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      price_alerts: {
+        Row: {
+          asset_id: string
+          asset_name: string
+          asset_symbol: string
+          condition: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_triggered: boolean
+          target_price: number
+          triggered_at: string | null
+          triggered_price: number | null
+          user_id: string
+        }
+        Insert: {
+          asset_id: string
+          asset_name: string
+          asset_symbol: string
+          condition: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_triggered?: boolean
+          target_price: number
+          triggered_at?: string | null
+          triggered_price?: number | null
+          user_id: string
+        }
+        Update: {
+          asset_id?: string
+          asset_name?: string
+          asset_symbol?: string
+          condition?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_triggered?: boolean
+          target_price?: number
+          triggered_at?: string | null
+          triggered_price?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       trades: {
         Row: {
           asset_id: string
