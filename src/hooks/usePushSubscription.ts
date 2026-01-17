@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || '';
+// VAPID public key for Web Push - safe to expose client-side
+const VAPID_PUBLIC_KEY = 'BGgSUlZYXj4YaPBr2cno2rNmvWAfXUeTR_PKYvkPokvn1Qk7h9tHT-oosUKuoAT1uLuI-bvYhRCItjBXgmBD6rs';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);

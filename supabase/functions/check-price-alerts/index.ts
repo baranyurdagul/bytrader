@@ -154,6 +154,36 @@ async function sendEmailNotification(
   }
 }
 
+async function sendPushNotification(
+  supabase: any,
+  alert: PriceAlert,
+  currentPrice: number
+): Promise<void> {
+  try {
+    const title = `📊 ${alert.asset_symbol} Alert Triggered!`;
+    const body = `${alert.asset_name} is now $${formatPrice(currentPrice)} (${alert.condition} $${formatPrice(alert.target_price)})`;
+    
+    const { error } = await supabase.functions.invoke('send-push-notification', {
+      body: {
+        userId: alert.user_id,
+        title,
+        body,
+        tag: `alert-${alert.id}`,
+        alertId: alert.id,
+        url: '/alerts',
+      },
+    });
+    
+    if (error) {
+      console.error('Failed to send push notification:', error);
+    } else {
+      console.log(`Push notification sent for alert ${alert.id}`);
+    }
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -259,8 +289,10 @@ Deno.serve(async (req) => {
           await sendEmailNotification(supabase, alert, currentPrice);
         }
         
-        // Note: Push notifications are handled by the client when it polls for updates
-        // Background push would require web-push with VAPID keys
+        // Send push notification if enabled
+        if (prefs?.push_enabled) {
+          await sendPushNotification(supabase, alert, currentPrice);
+        }
       }
     }
     
