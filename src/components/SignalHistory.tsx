@@ -37,12 +37,22 @@ function generateHistoricalSignals(commodityName: string): Array<Signal & { comm
       }
     }
     
+    const strength = strengths[Math.floor(Math.random() * strengths.length)];
+    const urgency = strength === 'STRONG' ? 'HIGH' : strength === 'MODERATE' ? 'MEDIUM' : 'LOW';
+    const actionMessage = type === 'BUY' 
+      ? `Good opportunity to consider buying ${commodityName}.`
+      : type === 'SELL' 
+        ? `Consider taking profits on ${commodityName}.`
+        : `Hold position on ${commodityName}.`;
+    
     signals.push({
       type,
-      strength: strengths[Math.floor(Math.random() * strengths.length)],
+      strength,
       indicators: selectedIndicators,
       confidence: Math.floor(Math.random() * 40) + 55,
       timestamp: new Date(Date.now() - (i + 1) * 4 * 60 * 60 * 1000),
+      actionMessage,
+      urgency: urgency as Signal['urgency'],
       commodity: commodityName
     });
   }
