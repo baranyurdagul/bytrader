@@ -95,9 +95,9 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
     }
     
     const metals = data.metals;
-    const goldPrice = metals.gold || 2650;
-    const silverPrice = metals.silver || 31.5;
-    const copperPrice = metals.copper ? metals.copper / 32150.7 : 0.30; // Convert from per ton to per oz
+    const goldPrice = metals.gold || 4500;
+    const silverPrice = metals.silver || 90;
+    const copperPrice = metals.copper ? metals.copper / 32150.7 : 5.50; // Convert from per ton to per lb
     
     // Calculate approximate 24h change (Metals.dev may provide this in premium tiers)
     const goldChange = (Math.random() - 0.5) * 20;
@@ -235,11 +235,11 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
   }
 }
 
-// Realistic fallback prices based on actual market data (January 2025)
+// Realistic fallback prices based on actual market data (January 2026)
 function getMetalFallbackData(): PriceData[] {
-  const goldBase = 2650 + (Math.random() - 0.5) * 30;
-  const silverBase = 31.5 + (Math.random() - 0.5) * 1;
-  const copperBase = 4.25 + (Math.random() - 0.5) * 0.1;
+  const goldBase = 4500 + (Math.random() - 0.5) * 50;
+  const silverBase = 90 + (Math.random() - 0.5) * 3;
+  const copperBase = 5.50 + (Math.random() - 0.5) * 0.15;
   
   return [
     {
@@ -249,12 +249,12 @@ function getMetalFallbackData(): PriceData[] {
       category: 'metal',
       price: goldBase,
       priceUnit: '/oz',
-      change: (Math.random() - 0.5) * 20,
+      change: (Math.random() - 0.5) * 40,
       changePercent: (Math.random() - 0.5) * 1,
       high24h: goldBase * 1.005,
       low24h: goldBase * 0.995,
       volume: '125.4K',
-      marketCap: '$12.5T',
+      marketCap: '$15.8T',
       lastUpdated: new Date().toISOString(),
     },
     {
@@ -264,12 +264,12 @@ function getMetalFallbackData(): PriceData[] {
       category: 'metal',
       price: silverBase,
       priceUnit: '/oz',
-      change: (Math.random() - 0.5) * 0.5,
+      change: (Math.random() - 0.5) * 2,
       changePercent: (Math.random() - 0.5) * 2,
       high24h: silverBase * 1.008,
       low24h: silverBase * 0.992,
       volume: '89.2K',
-      marketCap: '$1.4T',
+      marketCap: '$4.2T',
       lastUpdated: new Date().toISOString(),
     },
     {
@@ -279,12 +279,12 @@ function getMetalFallbackData(): PriceData[] {
       category: 'metal',
       price: copperBase,
       priceUnit: '/lb',
-      change: (Math.random() - 0.5) * 0.05,
+      change: (Math.random() - 0.5) * 0.08,
       changePercent: (Math.random() - 0.5) * 2,
       high24h: copperBase * 1.01,
       low24h: copperBase * 0.99,
       volume: '234.8K',
-      marketCap: '$245B',
+      marketCap: '$320B',
       lastUpdated: new Date().toISOString(),
     },
   ];
