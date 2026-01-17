@@ -6,35 +6,41 @@ import { TrendMeter } from '@/components/TrendMeter';
 import { TechnicalIndicatorsPanel } from '@/components/TechnicalIndicators';
 import { PriceChart } from '@/components/PriceChart';
 import { SignalHistory } from '@/components/SignalHistory';
+import { useLivePrices } from '@/hooks/useLivePrices';
 import { 
-  getCommodityData, 
   getTechnicalIndicators, 
   getSignal, 
   getTrendAnalysis,
-  CommodityData 
+  getCommodityData 
 } from '@/lib/tradingData';
+import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const Index = () => {
-  const [commodities] = useState<CommodityData[]>(() => getCommodityData());
+  const { commodities: liveCommodities, isLoading, error, lastUpdated, refetch } = useLivePrices(60000);
   const [selectedCommodityId, setSelectedCommodityId] = useState('gold');
   
+  // Fall back to simulated data if live data is not available
+  const commodities = liveCommodities.length > 0 ? liveCommodities : getCommodityData();
+  
   const selectedCommodity = useMemo(() => 
-    commodities.find(c => c.id === selectedCommodityId)!,
+    commodities.find(c => c.id === selectedCommodityId) || commodities[0],
     [commodities, selectedCommodityId]
   );
   
   const indicators = useMemo(() => 
-    getTechnicalIndicators(selectedCommodity.priceHistory),
+    selectedCommodity ? getTechnicalIndicators(selectedCommodity.priceHistory) : null,
     [selectedCommodity]
   );
   
   const signal = useMemo(() => 
-    getSignal(indicators, selectedCommodity.price, selectedCommodity.name),
-    [indicators, selectedCommodity.price, selectedCommodity.name]
+    indicators && selectedCommodity ? getSignal(indicators, selectedCommodity.price, selectedCommodity.name) : null,
+    [indicators, selectedCommodity]
   );
   
   const trend = useMemo(() => 
-    getTrendAnalysis(selectedCommodity.priceHistory, selectedCommodity.price),
+    selectedCommodity ? getTrendAnalysis(selectedCommodity.priceHistory, selectedCommodity.price) : null,
     [selectedCommodity]
   );
 
@@ -43,11 +49,53 @@ const Index = () => {
   const cryptoAssets = commodities.filter(c => c.category === 'crypto');
   const indexAssets = commodities.filter(c => c.category === 'index');
 
+  if (!selectedCommodity || !indicators || !signal || !trend) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading market data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       
       <main className="container mx-auto px-4 py-6">
+        {/* Connection Status Bar */}
+        <div className="flex items-center justify-between mb-6 p-3 rounded-lg bg-card border border-border">
+          <div className="flex items-center gap-3">
+            {error ? (
+              <>
+                <WifiOff className="w-4 h-4 text-warning" />
+                <span className="text-sm text-muted-foreground">
+                  Using simulated data
+                </span>
+              </>
+            ) : (
+              <>
+                <Wifi className="w-4 h-4 text-success" />
+                <span className="text-sm text-muted-foreground">
+                  Live prices {lastUpdated && `• Updated ${lastUpdated.toLocaleTimeString()}`}
+                </span>
+              </>
+            )}
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={refetch}
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
+
         {/* Metals Section */}
         <section className="mb-6">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
