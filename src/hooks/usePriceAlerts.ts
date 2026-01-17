@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 import { useServiceWorker } from './useServiceWorker';
-import { useNotificationPreferences } from './useNotificationPreferences';
 
 export interface PriceAlert {
   id: string;
@@ -28,13 +27,21 @@ export interface NewPriceAlert {
   condition: 'above' | 'below';
 }
 
+interface NotificationPrefs {
+  email_enabled: boolean;
+  push_enabled: boolean;
+  email_digest: boolean;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+}
+
 export function usePriceAlerts() {
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
   const { showNotification, requestPermission, permissionState, isSupported } = useServiceWorker();
-  const { preferences: notificationPrefs } = useNotificationPreferences();
   const notifiedAlertsRef = useRef<Set<string>>(new Set());
 
   const fetchAlerts = useCallback(async () => {
@@ -176,15 +183,34 @@ export function usePriceAlerts() {
     }
   }, []);
 
+  // Fetch notification preferences directly
+  const fetchNotificationPrefs = useCallback(async (): Promise<NotificationPrefs | null> => {
+    if (!user) return null;
+    
+    try {
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data as NotificationPrefs | null;
+    } catch (error) {
+      console.error('Error fetching notification preferences:', error);
+      return null;
+    }
+  }, [user]);
+
   // Check if currently in quiet hours
-  const isInQuietHours = useCallback(() => {
-    if (!notificationPrefs?.quiet_hours_enabled) return false;
+  const isInQuietHours = useCallback((prefs: NotificationPrefs | null) => {
+    if (!prefs?.quiet_hours_enabled) return false;
     
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
     
-    const [startHour, startMin] = (notificationPrefs.quiet_hours_start || '22:00').split(':').map(Number);
-    const [endHour, endMin] = (notificationPrefs.quiet_hours_end || '08:00').split(':').map(Number);
+    const [startHour, startMin] = (prefs.quiet_hours_start || '22:00').split(':').map(Number);
+    const [endHour, endMin] = (prefs.quiet_hours_end || '08:00').split(':').map(Number);
     
     const startTime = startHour * 60 + startMin;
     const endTime = endHour * 60 + endMin;
@@ -194,12 +220,15 @@ export function usePriceAlerts() {
       return currentTime >= startTime || currentTime < endTime;
     }
     return currentTime >= startTime && currentTime < endTime;
-  }, [notificationPrefs]);
+  }, []);
 
   // Check alerts against current prices
   const checkAlerts = useCallback(async (currentPrices: Record<string, number>) => {
     const activeAlerts = alerts.filter(a => a.is_active && !a.is_triggered);
     const triggeredAlerts: PriceAlert[] = [];
+    
+    // Fetch preferences once at the start
+    const notificationPrefs = await fetchNotificationPrefs();
 
     for (const alert of activeAlerts) {
       const currentPrice = currentPrices[alert.asset_id];
@@ -229,7 +258,7 @@ export function usePriceAlerts() {
           .eq('id', alert.id);
 
         // Check quiet hours
-        const inQuietHours = isInQuietHours();
+        const inQuietHours = isInQuietHours(notificationPrefs);
 
         // Show toast notification (always show unless in quiet hours)
         if (!inQuietHours) {
@@ -241,7 +270,8 @@ export function usePriceAlerts() {
         }
 
         // Show push notification via service worker (if enabled and not in quiet hours)
-        if (notificationPrefs?.push_enabled && !inQuietHours) {
+        const pushEnabled = notificationPrefs?.push_enabled !== false;
+        if (pushEnabled && !inQuietHours) {
           showNotification(
             `🔔 Price Alert: ${alert.asset_name}`,
             `${alert.asset_symbol} is now ${alert.condition} $${targetPrice.toLocaleString()} (Current: $${currentPrice.toLocaleString()})`,
@@ -253,7 +283,9 @@ export function usePriceAlerts() {
         }
 
         // Send email notification (if enabled and not digest mode)
-        if (notificationPrefs?.email_enabled && !notificationPrefs?.email_digest) {
+        const emailEnabled = notificationPrefs?.email_enabled !== false;
+        const emailDigest = notificationPrefs?.email_digest === true;
+        if (emailEnabled && !emailDigest) {
           sendEmailNotification(alert, currentPrice);
         }
       }
@@ -264,7 +296,7 @@ export function usePriceAlerts() {
     }
 
     return triggeredAlerts;
-  }, [alerts, toast, fetchAlerts, sendEmailNotification, showNotification, notificationPrefs, isInQuietHours]);
+  }, [alerts, toast, fetchAlerts, sendEmailNotification, showNotification, fetchNotificationPrefs, isInQuietHours]);
 
   // Request notification permission using service worker
   const requestNotificationPermission = useCallback(async () => {
