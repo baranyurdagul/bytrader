@@ -72,7 +72,7 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-6">
         {/* Connection Status Bar */}
-        <div className="flex items-center justify-between mb-6 p-3 rounded-lg bg-card border border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 p-3 rounded-lg bg-card border border-border">
           <div className="flex items-center gap-3">
             {error ? (
               <>
@@ -90,17 +90,18 @@ const Index = () => {
               </>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {isAuthenticated && (
               <>
                 <Button
                   variant={showWatchlist ? "default" : "outline"}
                   size="sm"
                   onClick={() => setShowWatchlist(!showWatchlist)}
-                  className="gap-2"
+                  className="gap-1.5 text-xs sm:text-sm"
                 >
-                  <Star className={cn("w-4 h-4", showWatchlist && "fill-current")} />
-                  Watchlist
+                  <Star className={cn("w-3.5 h-3.5 sm:w-4 sm:h-4", showWatchlist && "fill-current")} />
+                  <span className="hidden xs:inline">Watchlist</span>
+                  <span className="xs:hidden">Watch</span>
                   {watchlist.length > 0 && (
                     <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-primary-foreground text-primary">
                       {watchlist.length}
@@ -111,12 +112,12 @@ const Index = () => {
                   variant={showAlerts ? "default" : "outline"}
                   size="sm"
                   onClick={() => setShowAlerts(!showAlerts)}
-                  className="gap-2"
+                  className="gap-1.5 text-xs sm:text-sm"
                 >
                   {activeAlertsCount > 0 ? (
-                    <BellRing className="w-4 h-4" />
+                    <BellRing className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   ) : (
-                    <Bell className="w-4 h-4" />
+                    <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   )}
                   Alerts
                   {activeAlertsCount > 0 && (
@@ -144,13 +145,12 @@ const Index = () => {
             )}
             <Button 
               variant="ghost" 
-              size="sm" 
+              size="icon"
               onClick={refetch}
               disabled={isLoading}
-              className="gap-2"
+              title="Refresh prices"
             >
               <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-              Refresh
             </Button>
           </div>
         </div>
