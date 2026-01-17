@@ -22,14 +22,17 @@ const YAHOO_TICKERS: Record<string, string> = {
 };
 
 // Fetch historical data from Yahoo Finance
-async function fetchYahooHistory(ticker: string, days: number): Promise<HistoricalPrice[]> {
+async function fetchYahooHistory(ticker: string, days: number, interval: string = '1d'): Promise<HistoricalPrice[]> {
   try {
     // Calculate date range
     const endDate = Math.floor(Date.now() / 1000);
     const startDate = endDate - (days * 24 * 60 * 60);
     
+    // Yahoo Finance interval mapping
+    const yahooInterval = interval === '1h' ? '60m' : interval === '15m' ? '15m' : '1d';
+    
     const response = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startDate}&period2=${endDate}&interval=1d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startDate}&period2=${endDate}&interval=${yahooInterval}`,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -68,7 +71,7 @@ async function fetchYahooHistory(ticker: string, days: number): Promise<Historic
       }
     }
     
-    console.log(`Fetched ${history.length} historical points from Yahoo Finance for ${ticker}`);
+    console.log(`Fetched ${history.length} historical points from Yahoo Finance for ${ticker} (${yahooInterval})`);
     return history;
   } catch (error) {
     console.error(`Error fetching Yahoo history for ${ticker}:`, error);
@@ -77,37 +80,43 @@ async function fetchYahooHistory(ticker: string, days: number): Promise<Historic
 }
 
 // Fetch historical metal prices from Yahoo Finance
-async function fetchMetalHistory(metal: string, days: number = 365): Promise<HistoricalPrice[]> {
+async function fetchMetalHistory(metal: string, days: number = 365, interval: string = '1d'): Promise<HistoricalPrice[]> {
   const ticker = YAHOO_TICKERS[metal];
   
   if (ticker) {
-    const history = await fetchYahooHistory(ticker, days);
+    const history = await fetchYahooHistory(ticker, days, interval);
     if (history.length > 0) {
       return history;
     }
   }
   
   console.log(`Using generated data for ${metal}`);
-  return generateRealisticHistory(metal, days);
+  return generateRealisticHistory(metal, days, undefined, interval);
 }
 
 // Fetch historical crypto prices from CoinGecko (free, supports 1 year)
-async function fetchCryptoHistory(coinId: string, days: number = 365): Promise<HistoricalPrice[]> {
+async function fetchCryptoHistory(coinId: string, days: number = 365, interval: string = '1d'): Promise<HistoricalPrice[]> {
   try {
+    // CoinGecko uses different precision for different time ranges
+    // For hourly data (1 day), we need to request granular data
+    const cgInterval = days <= 1 ? '' : 'daily'; // CoinGecko auto-selects for <1 day
+    
     const response = await fetch(
-      `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=daily`
+      `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}${cgInterval ? `&interval=${cgInterval}` : ''}`
     );
     
     if (!response.ok) {
       console.error('CoinGecko history API error:', response.status);
-      return generateRealisticHistory(coinId, days);
+      return generateRealisticHistory(coinId, days, undefined, interval);
     }
     
     const data = await response.json();
     
     if (!data.prices || !Array.isArray(data.prices)) {
-      return generateRealisticHistory(coinId, days);
+      return generateRealisticHistory(coinId, days, undefined, interval);
     }
+    
+    console.log(`Fetched ${data.prices.length} historical points from CoinGecko for ${coinId}`);
     
     return data.prices.map((pricePoint: [number, number], index: number) => {
       const [timestamp, price] = pricePoint;
@@ -122,28 +131,28 @@ async function fetchCryptoHistory(coinId: string, days: number = 365): Promise<H
     });
   } catch (error) {
     console.error('Error fetching crypto history:', error);
-    return generateRealisticHistory(coinId, days);
+    return generateRealisticHistory(coinId, days, undefined, interval);
   }
 }
 
 // Fetch historical index prices from Yahoo Finance
-async function fetchIndexHistory(indexId: string, days: number = 365): Promise<HistoricalPrice[]> {
+async function fetchIndexHistory(indexId: string, days: number = 365, interval: string = '1d'): Promise<HistoricalPrice[]> {
   const ticker = YAHOO_TICKERS[indexId];
   
   if (ticker) {
-    const history = await fetchYahooHistory(ticker, days);
+    const history = await fetchYahooHistory(ticker, days, interval);
     if (history.length > 0) {
       return history;
     }
   }
   
   console.log(`Using generated data for ${indexId}`);
-  return generateRealisticHistory(indexId, days);
+  return generateRealisticHistory(indexId, days, undefined, interval);
 }
 
 // Generate realistic price history based on asset type and current price ranges (fallback)
 // Prices as of Jan 2026
-function generateRealisticHistory(assetId: string, days: number, endPrice?: number): HistoricalPrice[] {
+function generateRealisticHistory(assetId: string, days: number, endPrice?: number, interval: string = '1d'): HistoricalPrice[] {
   const history: HistoricalPrice[] = [];
   const now = Date.now();
   
@@ -160,24 +169,34 @@ function generateRealisticHistory(assetId: string, days: number, endPrice?: numb
   
   const config = priceRanges[assetId] || { current: endPrice || 100, yearAgoRange: [80, 120], volatility: 0.02 };
   
-  // Calculate starting price based on how far back we're going
-  const startPrice = config.yearAgoRange[0] + Math.random() * (config.yearAgoRange[1] - config.yearAgoRange[0]);
+  // For hourly data, generate 24 points for the last day
+  const isHourly = interval === '1h' || interval === '60m';
+  const numPoints = isHourly ? 24 : days;
+  const intervalMs = isHourly ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  
+  // For hourly, use a smaller range around current price
+  const startPrice = isHourly 
+    ? config.current * (1 - config.volatility * 2) 
+    : config.yearAgoRange[0] + Math.random() * (config.yearAgoRange[1] - config.yearAgoRange[0]);
   const priceTarget = config.current;
   
   let currentPrice = startPrice;
-  const dailyTrend = (priceTarget - startPrice) / days;
+  const trend = (priceTarget - startPrice) / numPoints;
   
-  for (let i = days; i >= 0; i--) {
-    const timestamp = now - i * 24 * 60 * 60 * 1000;
+  // Reduce volatility for hourly data
+  const volatilityMultiplier = isHourly ? 0.3 : 1;
+  
+  for (let i = numPoints; i >= 0; i--) {
+    const timestamp = now - i * intervalMs;
     
     // Add trend + random walk
-    const randomChange = (Math.random() - 0.5) * config.volatility * currentPrice;
-    const trendChange = dailyTrend * (0.8 + Math.random() * 0.4);
+    const randomChange = (Math.random() - 0.5) * config.volatility * volatilityMultiplier * currentPrice;
+    const trendChange = trend * (0.8 + Math.random() * 0.4);
     
     const open = currentPrice;
     const close = i === 0 ? priceTarget : currentPrice + trendChange + randomChange;
-    const high = Math.max(open, close) * (1 + Math.random() * 0.015);
-    const low = Math.min(open, close) * (1 - Math.random() * 0.015);
+    const high = Math.max(open, close) * (1 + Math.random() * 0.005 * (isHourly ? 1 : 3));
+    const low = Math.min(open, close) * (1 - Math.random() * 0.005 * (isHourly ? 1 : 3));
     
     history.push({
       timestamp,
@@ -185,7 +204,7 @@ function generateRealisticHistory(assetId: string, days: number, endPrice?: numb
       high,
       low,
       close: Math.max(close, 0.01), // Prevent negative prices
-      volume: Math.floor(Math.random() * 1000000) + 500000,
+      volume: Math.floor(Math.random() * (isHourly ? 100000 : 1000000)) + (isHourly ? 50000 : 500000),
     });
     
     currentPrice = close;
@@ -204,19 +223,20 @@ Deno.serve(async (req) => {
     const assetId = url.searchParams.get('asset') || 'gold';
     const days = parseInt(url.searchParams.get('days') || '365');
     const category = url.searchParams.get('category') || 'metal';
+    const interval = url.searchParams.get('interval') || '1d'; // '1h' for hourly, '1d' for daily
     
-    console.log(`Fetching ${days} days of history for ${assetId} (${category})`);
+    console.log(`Fetching ${days} days of history for ${assetId} (${category}) with interval ${interval}`);
     
     let history: HistoricalPrice[];
     
     if (category === 'crypto') {
-      history = await fetchCryptoHistory(assetId, days);
+      history = await fetchCryptoHistory(assetId, days, interval);
     } else if (category === 'metal') {
-      history = await fetchMetalHistory(assetId, days);
+      history = await fetchMetalHistory(assetId, days, interval);
     } else if (category === 'index') {
-      history = await fetchIndexHistory(assetId, days);
+      history = await fetchIndexHistory(assetId, days, interval);
     } else {
-      history = generateRealisticHistory(assetId, days);
+      history = generateRealisticHistory(assetId, days, undefined, interval);
     }
     
     console.log(`Returning ${history.length} price points`);

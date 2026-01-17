@@ -209,6 +209,7 @@ const AssetDetail = () => {
               priceHistory={selectedCommodity.priceHistory}
               indicators={indicators}
               commodityId={selectedCommodity.id}
+              category={selectedCommodity.category}
             />
             
             {/* Quick Stats with Tooltips */}
