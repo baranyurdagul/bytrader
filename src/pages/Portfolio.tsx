@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header } from '@/components/Header';
+import { Layout } from '@/components/Layout';
 import { AddTradeDialog } from '@/components/AddTradeDialog';
 import { PortfolioCharts } from '@/components/PortfolioCharts';
 import { useAuth } from '@/hooks/useAuth';
@@ -45,16 +45,17 @@ const Portfolio = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
+      <Layout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </Layout>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
+      <Layout>
         <main className="container mx-auto px-4 py-12">
           <div className="max-w-md mx-auto text-center">
             <Wallet className="w-16 h-16 mx-auto mb-6 text-muted-foreground" />
@@ -70,14 +71,12 @@ const Portfolio = () => {
             </Button>
           </div>
         </main>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
+    <Layout>
       <main className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -234,7 +233,7 @@ const Portfolio = () => {
           </div>
         </div>
       </main>
-    </div>
+    </Layout>
   );
 };
 
