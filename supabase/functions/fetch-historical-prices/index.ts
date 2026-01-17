@@ -128,9 +128,9 @@ function generateRealisticHistory(assetId: string, days: number, endPrice?: numb
   // Realistic price ranges for each asset (Jan 2026 context - using real market data)
   // Note: These are realistic prices based on actual market trends
   const priceRanges: Record<string, { current: number; yearAgoRange: [number, number]; volatility: number }> = {
-    gold: { current: endPrice || 2650, yearAgoRange: [2000, 2100], volatility: 0.008 },
-    silver: { current: endPrice || 31, yearAgoRange: [22, 25], volatility: 0.012 },
-    copper: { current: endPrice || 4.20, yearAgoRange: [3.80, 4.00], volatility: 0.015 },
+    gold: { current: endPrice || 4500, yearAgoRange: [2500, 2700], volatility: 0.008 },
+    silver: { current: endPrice || 90, yearAgoRange: [28, 33], volatility: 0.012 },
+    copper: { current: endPrice || 5.50, yearAgoRange: [4.00, 4.50], volatility: 0.015 },
     bitcoin: { current: endPrice || 95000, yearAgoRange: [40000, 50000], volatility: 0.04 },
     ethereum: { current: endPrice || 3300, yearAgoRange: [2200, 2800], volatility: 0.045 },
     nasdaq100: { current: endPrice || 21500, yearAgoRange: [16000, 18000], volatility: 0.015 },

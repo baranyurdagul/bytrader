@@ -82,11 +82,11 @@ function generateFallbackHistory(assetId: string, category: string, days: number
   const history: PricePoint[] = [];
   const now = Date.now();
   
-  // Realistic prices based on actual market data (2024-2025)
+  // Realistic prices based on actual market data (2025-2026)
   const configs: Record<string, { current: number; yearAgo: number; volatility: number }> = {
-    gold: { current: 2650, yearAgo: 2050, volatility: 0.008 },
-    silver: { current: 31, yearAgo: 23, volatility: 0.012 },
-    copper: { current: 4.25, yearAgo: 3.85, volatility: 0.015 },
+    gold: { current: 4500, yearAgo: 2650, volatility: 0.008 },
+    silver: { current: 90, yearAgo: 31, volatility: 0.012 },
+    copper: { current: 5.50, yearAgo: 4.25, volatility: 0.015 },
     bitcoin: { current: 95000, yearAgo: 45000, volatility: 0.04 },
     ethereum: { current: 3300, yearAgo: 2500, volatility: 0.045 },
     nasdaq100: { current: 21500, yearAgo: 17000, volatility: 0.015 },
