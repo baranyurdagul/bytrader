@@ -1,24 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { CommodityCard, PriceUnit } from '@/components/CommodityCard';
-import { SignalCard } from '@/components/SignalCard';
-import { TrendMeter } from '@/components/TrendMeter';
-import { TechnicalIndicatorsPanel } from '@/components/TechnicalIndicators';
-import { PriceChart } from '@/components/PriceChart';
-import { SignalHistory } from '@/components/SignalHistory';
 import { AddAlertDialog } from '@/components/AddAlertDialog';
 import { AlertsList } from '@/components/AlertsList';
-import { NewsFeed } from '@/components/NewsFeed';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { usePriceAlerts } from '@/hooks/usePriceAlerts';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useAuth } from '@/hooks/useAuth';
-import { 
-  getTechnicalIndicators, 
-  getSignal, 
-  getTrendAnalysis,
-  getCommodityData 
-} from '@/lib/tradingData';
+import { getCommodityData } from '@/lib/tradingData';
 import { RefreshCw, Wifi, WifiOff, Bell, BellRing, Scale, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -39,7 +28,6 @@ const Index = () => {
     activeAlertsCount 
   } = usePriceAlerts();
   const { watchlist, isInWatchlist, toggleWatchlist } = useWatchlist();
-  const [selectedCommodityId, setSelectedCommodityId] = useState('gold');
   const [showAlerts, setShowAlerts] = useState(false);
   const [showWatchlist, setShowWatchlist] = useState(false);
   const [metalPriceUnit, setMetalPriceUnit] = useState<PriceUnit>('oz');
@@ -62,26 +50,6 @@ const Index = () => {
       checkAlerts(currentPrices);
     }
   }, [currentPrices, checkAlerts, isAuthenticated]);
-  
-  const selectedCommodity = useMemo(() => 
-    commodities.find(c => c.id === selectedCommodityId) || commodities[0],
-    [commodities, selectedCommodityId]
-  );
-  
-  const indicators = useMemo(() => 
-    selectedCommodity ? getTechnicalIndicators(selectedCommodity.priceHistory) : null,
-    [selectedCommodity]
-  );
-  
-  const signal = useMemo(() => 
-    indicators && selectedCommodity ? getSignal(indicators, selectedCommodity.price, selectedCommodity.name) : null,
-    [indicators, selectedCommodity]
-  );
-  
-  const trend = useMemo(() => 
-    selectedCommodity ? getTrendAnalysis(selectedCommodity.priceHistory, selectedCommodity.price) : null,
-    [selectedCommodity]
-  );
 
   // Group commodities by category
   const metalAssets = commodities.filter(c => c.category === 'metal');
@@ -95,16 +63,9 @@ const Index = () => {
       .filter(Boolean);
   }, [watchlist, commodities]);
 
-  if (!selectedCommodity || !indicators || !signal || !trend) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading market data...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleAssetClick = (assetId: string) => {
+    navigate(`/asset/${assetId}`);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -168,7 +129,6 @@ const Index = () => {
                 <AddAlertDialog 
                   commodities={commodities} 
                   onAddAlert={addAlert}
-                  selectedAssetId={selectedCommodityId}
                 />
               </>
             )}
@@ -210,7 +170,7 @@ const Index = () => {
                 onClick={requestNotificationPermission}
                 className="text-xs"
               >
-                Enable Browser Notifications
+                Enable Push Notifications
               </Button>
             </div>
             <AlertsList
@@ -243,8 +203,8 @@ const Index = () => {
                   <CommodityCard
                     key={commodity.id}
                     commodity={commodity}
-                    isSelected={commodity.id === selectedCommodityId}
-                    onClick={() => setSelectedCommodityId(commodity.id)}
+                    isSelected={false}
+                    onClick={() => handleAssetClick(commodity.id)}
                     priceUnit={commodity.category === 'metal' ? metalPriceUnit : 'oz'}
                     isInWatchlist={true}
                     onToggleWatchlist={() => toggleWatchlist({
@@ -259,6 +219,14 @@ const Index = () => {
             )}
           </section>
         )}
+
+        {/* Hero Section */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-foreground mb-2">Market Dashboard</h1>
+          <p className="text-muted-foreground">
+            Select an asset to view detailed analysis, charts, and trading signals
+          </p>
+        </div>
 
         {/* Metals Section */}
         <section className="mb-6">
@@ -294,8 +262,8 @@ const Index = () => {
               <CommodityCard
                 key={commodity.id}
                 commodity={commodity}
-                isSelected={commodity.id === selectedCommodityId}
-                onClick={() => setSelectedCommodityId(commodity.id)}
+                isSelected={false}
+                onClick={() => handleAssetClick(commodity.id)}
                 priceUnit={metalPriceUnit}
                 isInWatchlist={isInWatchlist(commodity.id)}
                 onToggleWatchlist={() => toggleWatchlist({
@@ -319,8 +287,8 @@ const Index = () => {
               <CommodityCard
                 key={commodity.id}
                 commodity={commodity}
-                isSelected={commodity.id === selectedCommodityId}
-                onClick={() => setSelectedCommodityId(commodity.id)}
+                isSelected={false}
+                onClick={() => handleAssetClick(commodity.id)}
                 isInWatchlist={isInWatchlist(commodity.id)}
                 onToggleWatchlist={() => toggleWatchlist({
                   asset_id: commodity.id,
@@ -343,8 +311,8 @@ const Index = () => {
               <CommodityCard
                 key={commodity.id}
                 commodity={commodity}
-                isSelected={commodity.id === selectedCommodityId}
-                onClick={() => setSelectedCommodityId(commodity.id)}
+                isSelected={false}
+                onClick={() => handleAssetClick(commodity.id)}
                 isInWatchlist={isInWatchlist(commodity.id)}
                 onToggleWatchlist={() => toggleWatchlist({
                   asset_id: commodity.id,
@@ -356,65 +324,6 @@ const Index = () => {
             ))}
           </div>
         </section>
-        
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column - Signal & Trend */}
-          <div className="lg:col-span-4 space-y-6">
-            <SignalCard signal={signal} commodityName={selectedCommodity.name} />
-            <TrendMeter trend={trend} />
-            <SignalHistory commodityName={selectedCommodity.name} />
-            <NewsFeed assetName={selectedCommodity.name} assetSymbol={selectedCommodity.symbol} />
-          </div>
-          
-          {/* Center Column - Chart */}
-          <div className="lg:col-span-5 space-y-6">
-            <PriceChart 
-              priceHistory={selectedCommodity.priceHistory}
-              indicators={indicators}
-              commodityId={selectedCommodity.id}
-            />
-            
-            {/* Quick Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xs text-muted-foreground mb-1">RSI</p>
-                <p className="text-lg font-mono font-semibold text-foreground">
-                  {indicators.rsi.toFixed(1)}
-                </p>
-              </div>
-              <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xs text-muted-foreground mb-1">MACD</p>
-                <p className={`text-lg font-mono font-semibold ${indicators.macd.histogram > 0 ? 'text-success' : 'text-destructive'}`}>
-                  {indicators.macd.histogram > 0 ? '+' : ''}{indicators.macd.histogram.toFixed(3)}
-                </p>
-              </div>
-              <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xs text-muted-foreground mb-1">ATR</p>
-                <p className="text-lg font-mono font-semibold text-foreground">
-                  ${indicators.atr.toFixed(2)}
-                </p>
-              </div>
-              <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xs text-muted-foreground mb-1">ADX</p>
-                <p className="text-lg font-mono font-semibold text-foreground">
-                  {indicators.adx.toFixed(1)}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Right Column - Technical Indicators */}
-          <div className="lg:col-span-3">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Technical Analysis</h2>
-            <div className="max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin pr-2">
-              <TechnicalIndicatorsPanel 
-                indicators={indicators} 
-                currentPrice={selectedCommodity.price}
-              />
-            </div>
-          </div>
-        </div>
         
         {/* Footer Note */}
         <footer className="mt-12 text-center">
