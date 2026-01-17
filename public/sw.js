@@ -28,10 +28,11 @@ self.addEventListener('push', (event) => {
     body: data.body,
     icon: '/favicon.ico',
     badge: '/favicon.ico',
-    vibrate: [200, 100, 200],
+    vibrate: [300, 100, 300, 100, 300], // More noticeable vibration pattern
     tag: data.tag || 'price-alert',
-    renotify: true,
-    requireInteraction: true,
+    renotify: true, // Always alert even if same tag
+    requireInteraction: true, // Keep notification visible
+    silent: false, // Ensure sound plays (uses system notification sound)
     data: {
       url: data.url || '/',
       alertId: data.alertId
@@ -91,10 +92,11 @@ self.addEventListener('message', (event) => {
       body,
       icon: '/favicon.ico',
       badge: '/favicon.ico',
-      vibrate: [200, 100, 200],
+      vibrate: [300, 100, 300, 100, 300], // More noticeable vibration pattern
       tag: tag || 'price-alert',
       renotify: true,
       requireInteraction: true,
+      silent: false, // Ensure sound plays
       data: {
         url: '/',
         alertId
