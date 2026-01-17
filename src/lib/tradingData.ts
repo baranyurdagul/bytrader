@@ -14,6 +14,7 @@ export interface CommodityData {
   volume: string;
   marketCap: string;
   priceHistory: PricePoint[];
+  dataSource?: 'live' | 'simulated';
 }
 
 export interface PricePoint {

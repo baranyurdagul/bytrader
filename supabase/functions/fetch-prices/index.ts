@@ -17,19 +17,8 @@ interface PriceData {
   volume: string;
   marketCap: string;
   lastUpdated: string;
+  dataSource: 'live' | 'simulated';
 }
-
-interface HistoricalPrice {
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
-
-// Cache for historical data (to avoid excessive API calls)
-const historicalCache: Map<string, { data: HistoricalPrice[], timestamp: number }> = new Map();
 
 // Fetch crypto prices from CoinGecko (free, no API key needed)
 async function fetchCryptoPrices(): Promise<PriceData[]> {
@@ -59,6 +48,7 @@ async function fetchCryptoPrices(): Promise<PriceData[]> {
       volume: formatVolume(coin.total_volume),
       marketCap: formatMarketCap(coin.market_cap),
       lastUpdated: new Date().toISOString(),
+      dataSource: 'live' as const,
     }));
   } catch (error) {
     console.error('Error fetching crypto prices:', error);
@@ -104,6 +94,7 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
                 volume: '125.4K',
                 marketCap: '$15.8T',
                 lastUpdated: new Date().toISOString(),
+                dataSource: 'live',
               },
               {
                 id: 'silver',
@@ -119,6 +110,7 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
                 volume: '89.2K',
                 marketCap: '$4.2T',
                 lastUpdated: new Date().toISOString(),
+                dataSource: 'live',
               },
               {
                 id: 'copper',
@@ -134,6 +126,7 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
                 volume: '234.8K',
                 marketCap: '$320B',
                 lastUpdated: new Date().toISOString(),
+                dataSource: copperPrice ? 'live' : 'simulated',
               },
             ];
           }
@@ -178,6 +171,7 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
               volume: '125.4K',
               marketCap: '$15.8T',
               lastUpdated: new Date().toISOString(),
+              dataSource: 'live',
             },
             {
               id: 'silver',
@@ -193,6 +187,7 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
               volume: '89.2K',
               marketCap: '$4.2T',
               lastUpdated: new Date().toISOString(),
+              dataSource: 'live',
             },
             {
               id: 'copper',
@@ -208,6 +203,7 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
               volume: '234.8K',
               marketCap: '$320B',
               lastUpdated: new Date().toISOString(),
+              dataSource: 'live',
             },
           ];
         }
@@ -264,6 +260,7 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
         volume: '4.2B',
         marketCap: '$25T',
         lastUpdated: new Date().toISOString(),
+        dataSource: 'live',
       });
     }
     
@@ -287,6 +284,7 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
         volume: '3.8B',
         marketCap: '$42T',
         lastUpdated: new Date().toISOString(),
+        dataSource: 'live',
       });
     }
     
@@ -322,6 +320,7 @@ function getMetalFallbackData(): PriceData[] {
       volume: '125.4K',
       marketCap: '$15.8T',
       lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
     },
     {
       id: 'silver',
@@ -337,6 +336,7 @@ function getMetalFallbackData(): PriceData[] {
       volume: '89.2K',
       marketCap: '$4.2T',
       lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
     },
     {
       id: 'copper',
@@ -352,6 +352,7 @@ function getMetalFallbackData(): PriceData[] {
       volume: '234.8K',
       marketCap: '$320B',
       lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
     },
   ];
 }
@@ -375,6 +376,7 @@ function getCryptoFallbackData(): PriceData[] {
       volume: '27.8B',
       marketCap: '$1.9T',
       lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
     },
     {
       id: 'ethereum',
@@ -390,6 +392,7 @@ function getCryptoFallbackData(): PriceData[] {
       volume: '19.4B',
       marketCap: '$398B',
       lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
     },
   ];
 }
@@ -413,6 +416,7 @@ function getIndicesFallbackData(): PriceData[] {
       volume: '4.2B',
       marketCap: '$25T',
       lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
     },
     {
       id: 'sp500',
@@ -428,6 +432,7 @@ function getIndicesFallbackData(): PriceData[] {
       volume: '3.8B',
       marketCap: '$42T',
       lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
     },
   ];
 }
