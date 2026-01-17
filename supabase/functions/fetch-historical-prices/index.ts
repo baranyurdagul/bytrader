@@ -125,16 +125,15 @@ function generateRealisticHistory(assetId: string, days: number, endPrice?: numb
   const history: HistoricalPrice[] = [];
   const now = Date.now();
   
-  // Realistic price ranges for each asset (Jan 2026 context - using real market data)
-  // Note: These are realistic prices based on actual market trends
+  // Realistic price ranges for each asset (using actual market data Jan 2025)
   const priceRanges: Record<string, { current: number; yearAgoRange: [number, number]; volatility: number }> = {
-    gold: { current: endPrice || 4500, yearAgoRange: [2500, 2700], volatility: 0.008 },
-    silver: { current: endPrice || 90, yearAgoRange: [28, 33], volatility: 0.012 },
-    copper: { current: endPrice || 5.50, yearAgoRange: [4.00, 4.50], volatility: 0.015 },
-    bitcoin: { current: endPrice || 95000, yearAgoRange: [40000, 50000], volatility: 0.04 },
-    ethereum: { current: endPrice || 3300, yearAgoRange: [2200, 2800], volatility: 0.045 },
-    nasdaq100: { current: endPrice || 21500, yearAgoRange: [16000, 18000], volatility: 0.015 },
-    sp500: { current: endPrice || 5900, yearAgoRange: [4800, 5200], volatility: 0.012 },
+    gold: { current: endPrice || 2650, yearAgoRange: [1950, 2050], volatility: 0.008 },
+    silver: { current: endPrice || 31.5, yearAgoRange: [22, 25], volatility: 0.012 },
+    copper: { current: endPrice || 4.25, yearAgoRange: [3.60, 4.00], volatility: 0.015 },
+    bitcoin: { current: endPrice || 95000, yearAgoRange: [40000, 45000], volatility: 0.04 },
+    ethereum: { current: endPrice || 3300, yearAgoRange: [2200, 2500], volatility: 0.045 },
+    nasdaq100: { current: endPrice || 21500, yearAgoRange: [16500, 17500], volatility: 0.015 },
+    sp500: { current: endPrice || 5900, yearAgoRange: [4700, 5000], volatility: 0.012 },
   };
   
   const config = priceRanges[assetId] || { current: endPrice || 100, yearAgoRange: [80, 120], volatility: 0.02 };
