@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Portfolio from "./pages/Portfolio";
+import Alerts from "./pages/Alerts";
 import Install from "./pages/Install";
 import AssetDetail from "./pages/AssetDetail";
 import NotFound from "./pages/NotFound";
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/alerts" element={<Alerts />} />
           <Route path="/install" element={<Install />} />
           <Route path="/asset/:assetId" element={<AssetDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

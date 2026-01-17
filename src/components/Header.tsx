@@ -59,6 +59,18 @@ export function Header() {
                 <Wallet className="w-4 h-4" />
                 Portfolio
               </Link>
+              <Link
+                to="/alerts"
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
+                  location.pathname === '/alerts'
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                )}
+              >
+                <Bell className="w-4 h-4" />
+                Alerts
+              </Link>
             </nav>
           </div>
           
@@ -68,9 +80,12 @@ export function Header() {
               <span className="text-xs font-medium text-success">Markets Open</span>
             </div>
             
-            <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
+            <Link 
+              to="/alerts"
+              className="p-2 rounded-lg hover:bg-secondary transition-colors"
+            >
               <Bell className="w-5 h-5 text-muted-foreground" />
-            </button>
+            </Link>
 
             {isAuthenticated ? (
               <DropdownMenu>
