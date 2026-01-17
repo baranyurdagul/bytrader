@@ -418,11 +418,12 @@ function calculateTrendAnalysis(priceHistory: PricePoint[], currentPrice: number
 }
 
 // Main function to get all asset data
+// Prices updated for Jan 2026
 export function getCommodityData(): CommodityData[] {
-  // Metals (prices per troy ounce)
-  const goldHistory = generatePriceHistory(2650, 0.015);
-  const silverHistory = generatePriceHistory(31.5, 0.025);
-  const copperHistory = generatePriceHistory(4.25, 0.02);
+  // Metals (prices per troy ounce) - Jan 2026
+  const goldHistory = generatePriceHistory(4500, 0.015);
+  const silverHistory = generatePriceHistory(90, 0.025);
+  const copperHistory = generatePriceHistory(5.50, 0.02);
   
   // Crypto
   const bitcoinHistory = generatePriceHistory(95000, 0.04);
