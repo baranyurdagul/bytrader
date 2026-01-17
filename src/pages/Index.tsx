@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Header } from '@/components/Header';
+import { Layout } from '@/components/Layout';
 import { CommodityCard, PriceUnit } from '@/components/CommodityCard';
 import { AddAlertDialog } from '@/components/AddAlertDialog';
 import { AlertsList } from '@/components/AlertsList';
@@ -68,8 +68,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <Layout>
       
       <main className="container mx-auto px-4 py-6">
         {/* Connection Status Bar */}
@@ -333,7 +332,7 @@ const Index = () => {
           </p>
         </footer>
       </main>
-    </div>
+    </Layout>
   );
 };
 

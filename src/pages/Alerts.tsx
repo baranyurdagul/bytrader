@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Header } from '@/components/Header';
+import { Layout } from '@/components/Layout';
 import { AlertsList } from '@/components/AlertsList';
 import { AddAlertDialog } from '@/components/AddAlertDialog';
 import { NotificationSettings } from '@/components/NotificationSettings';
@@ -59,21 +59,19 @@ export default function Alerts() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
+      <Layout>
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
+      <Layout>
         <div className="container mx-auto px-4 py-8">
           <Card className="max-w-md mx-auto">
             <CardHeader className="text-center">
@@ -95,14 +93,12 @@ export default function Alerts() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
+    <Layout>
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -266,9 +262,8 @@ export default function Alerts() {
           </CardContent>
         </Card>
 
-        {/* Notification Settings */}
         <NotificationSettings />
       </main>
-    </div>
+    </Layout>
   );
 }

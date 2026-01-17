@@ -1,6 +1,6 @@
 import { useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Header } from '@/components/Header';
+import { Layout } from '@/components/Layout';
 import { SignalCard } from '@/components/SignalCard';
 import { TrendMeter } from '@/components/TrendMeter';
 import { TechnicalIndicatorsPanel } from '@/components/TechnicalIndicators';
@@ -94,8 +94,7 @@ const AssetDetail = () => {
 
   if (!selectedCommodity) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
+      <Layout>
         <main className="container mx-auto px-4 py-12 text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">Asset Not Found</h1>
           <p className="text-muted-foreground mb-6">The asset you're looking for doesn't exist.</p>
@@ -104,27 +103,27 @@ const AssetDetail = () => {
             Back to Dashboard
           </Button>
         </main>
-      </div>
+      </Layout>
     );
   }
 
   if (!indicators || !signal || !trend) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Loading analysis...</p>
+      <Layout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="text-center">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+            <p className="text-muted-foreground">Loading analysis...</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   const isPositive = selectedCommodity.change >= 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
+    <Layout>
       <main className="container mx-auto px-4 py-6">
         {/* Back Button & Asset Header */}
         <div className="mb-6">
@@ -333,7 +332,7 @@ const AssetDetail = () => {
           </p>
         </footer>
       </main>
-    </div>
+    </Layout>
   );
 };
 
