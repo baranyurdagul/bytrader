@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are an expert trading assistant specializing in commodities (Gold, Silver, Copper) and cryptocurrencies (Bitcoin, Ethereum). You provide:
+const BASE_SYSTEM_PROMPT = `You are an expert trading assistant specializing in commodities (Gold, Silver, Copper) and cryptocurrencies (Bitcoin, Ethereum). You provide:
 
 1. **Market Analysis**: Technical and fundamental analysis, price trends, support/resistance levels
 2. **Trading Signals**: Explain buy/sell signals, momentum indicators (RSI, MACD, Moving Averages)
@@ -28,18 +28,41 @@ Current market context (January 2026):
 
 When users ask about specific assets, provide current context and what to watch for.`;
 
+function buildSystemPrompt(portfolio: any): string {
+  if (!portfolio || !portfolio.positions || portfolio.positions.length === 0) {
+    return BASE_SYSTEM_PROMPT + "\n\nThe user has no portfolio data available.";
+  }
+
+  const positionsSummary = portfolio.positions.map((p: any) => 
+    `- ${p.asset_name} (${p.asset_symbol}): ${p.quantity.toFixed(4)} units, avg buy $${p.averageBuyPrice.toFixed(2)}, current value $${p.currentValue.toFixed(2)}, P/L: ${p.profitLoss >= 0 ? '+' : ''}$${p.profitLoss.toFixed(2)} (${p.profitLossPercent >= 0 ? '+' : ''}${p.profitLossPercent.toFixed(1)}%)`
+  ).join('\n');
+
+  return `${BASE_SYSTEM_PROMPT}
+
+**USER'S CURRENT PORTFOLIO:**
+${positionsSummary}
+
+**Portfolio Summary:**
+- Total Value: $${portfolio.totalValue.toFixed(2)}
+- Total P/L: ${portfolio.totalProfitLoss >= 0 ? '+' : ''}$${portfolio.totalProfitLoss.toFixed(2)} (${portfolio.totalProfitLossPercent >= 0 ? '+' : ''}${portfolio.totalProfitLossPercent.toFixed(1)}%)
+
+Use this portfolio data to provide personalized insights when relevant. Reference specific holdings when giving advice.`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, portfolio } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
+
+    const systemPrompt = buildSystemPrompt(portfolio);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -50,7 +73,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           ...messages,
         ],
         stream: true,
