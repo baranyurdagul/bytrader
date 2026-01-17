@@ -10,9 +10,10 @@ interface PriceChartProps {
   commodityId: string;
 }
 
-type TimeRange = '1W' | '1M' | '3M' | '1Y';
+type TimeRange = '1D' | '1W' | '1M' | '3M' | '1Y';
 
 const TIME_RANGES: { label: string; value: TimeRange; days: number }[] = [
+  { label: '1D', value: '1D', days: 1 },
   { label: '1W', value: '1W', days: 7 },
   { label: '1M', value: '1M', days: 30 },
   { label: '3M', value: '3M', days: 90 },
@@ -20,7 +21,7 @@ const TIME_RANGES: { label: string; value: TimeRange; days: number }[] = [
 ];
 
 export function PriceChart({ priceHistory, indicators, commodityId }: PriceChartProps) {
-  const [selectedRange, setSelectedRange] = useState<TimeRange>('1M');
+  const [selectedRange, setSelectedRange] = useState<TimeRange>('1D');
 
   const selectedDays = TIME_RANGES.find(r => r.value === selectedRange)?.days || 30;
   
@@ -32,7 +33,9 @@ export function PriceChart({ priceHistory, indicators, commodityId }: PriceChart
     const date = new Date(point.timestamp);
     let formattedDate: string;
     
-    if (selectedRange === '1W') {
+    if (selectedRange === '1D') {
+      formattedDate = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    } else if (selectedRange === '1W') {
       formattedDate = date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
     } else if (selectedRange === '1Y') {
       formattedDate = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
