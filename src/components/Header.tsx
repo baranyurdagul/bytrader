@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Bell, Settings, Coins, Wallet, User, LogOut, LogIn } from 'lucide-react';
+import { Activity, Bell, Settings, Coins, Wallet, User, LogOut, LogIn, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,13 +11,47 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export function Header() {
   const location = useLocation();
   const { user, signOut, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    
+    try {
+      // Clear all caches for PWA
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+      
+      // Unregister service workers to get fresh content
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(reg => reg.update()));
+      }
+      
+      toast({
+        title: "Refreshing app...",
+        description: "Loading latest version",
+      });
+      
+      // Force reload from server (bypass cache)
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      window.location.reload();
+    }
   };
 
   return (
@@ -75,6 +110,21 @@ export function Header() {
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Refresh Button for PWA */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="relative"
+              title="Refresh app"
+            >
+              <RefreshCw className={cn(
+                "w-5 h-5 text-muted-foreground",
+                isRefreshing && "animate-spin"
+              )} />
+            </Button>
+            
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/20">
               <Activity className="w-4 h-4 text-success animate-pulse" />
               <span className="text-xs font-medium text-success">Markets Open</span>
