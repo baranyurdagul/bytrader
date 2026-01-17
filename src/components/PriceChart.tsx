@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PricePoint, TechnicalIndicators as TechnicalIndicatorsType } from '@/lib/tradingData';
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useHistoricalPrices } from '@/hooks/useHistoricalPrices';
+import { Loader2 } from 'lucide-react';
 
 interface PriceChartProps {
   priceHistory: PricePoint[];
   indicators: TechnicalIndicatorsType;
   commodityId: string;
+  category?: 'metal' | 'crypto' | 'index';
 }
 
 type TimeRange = '1D' | '1W' | '1M' | '3M' | '1Y';
@@ -20,42 +23,62 @@ const TIME_RANGES: { label: string; value: TimeRange; days: number }[] = [
   { label: '1Y', value: '1Y', days: 365 },
 ];
 
-export function PriceChart({ priceHistory, indicators, commodityId }: PriceChartProps) {
+export function PriceChart({ priceHistory, indicators, commodityId, category = 'metal' }: PriceChartProps) {
   const [selectedRange, setSelectedRange] = useState<TimeRange>('1D');
 
-  const selectedDays = TIME_RANGES.find(r => r.value === selectedRange)?.days || 30;
+  const selectedDays = TIME_RANGES.find(r => r.value === selectedRange)?.days || 1;
+  const isHourly = selectedRange === '1D';
   
-  // Filter price history based on selected range
-  const filteredHistory = priceHistory.slice(-selectedDays);
-
-  const chartData = filteredHistory.map((point, index) => {
-    // Format date based on time range
-    const date = new Date(point.timestamp);
-    let formattedDate: string;
-    
-    if (selectedRange === '1D') {
-      formattedDate = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    } else if (selectedRange === '1W') {
-      formattedDate = date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
-    } else if (selectedRange === '1Y') {
-      formattedDate = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-    } else {
-      formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-
-    return {
-      date: formattedDate,
-      price: point.close,
-      high: point.high,
-      low: point.low,
-      sma20: index >= 19 ? indicators.movingAverages.sma20 : null,
-      upperBB: indicators.bollingerBands.upper,
-      lowerBB: indicators.bollingerBands.lower,
-    };
+  // Fetch historical data for the selected range
+  const { priceHistory: fetchedHistory, isLoading } = useHistoricalPrices({
+    assetId: commodityId,
+    category,
+    days: selectedDays,
+    interval: isHourly ? '1h' : '1d',
   });
+  
+  // Use fetched history for the chart, fallback to prop data
+  const activeHistory = useMemo(() => {
+    if (isHourly && fetchedHistory.length > 0) {
+      return fetchedHistory;
+    }
+    if (!isHourly && fetchedHistory.length > 0) {
+      return fetchedHistory;
+    }
+    // Fallback: filter the provided priceHistory
+    return priceHistory.slice(-selectedDays);
+  }, [fetchedHistory, priceHistory, selectedDays, isHourly]);
 
-  const currentPrice = filteredHistory[filteredHistory.length - 1]?.close || 0;
-  const startPrice = filteredHistory[0]?.close || 0;
+  const chartData = useMemo(() => {
+    return activeHistory.map((point, index) => {
+      // Format date based on time range
+      const date = new Date(point.timestamp);
+      let formattedDate: string;
+      
+      if (selectedRange === '1D') {
+        formattedDate = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      } else if (selectedRange === '1W') {
+        formattedDate = date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+      } else if (selectedRange === '1Y') {
+        formattedDate = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      } else {
+        formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+
+      return {
+        date: formattedDate,
+        price: point.close,
+        high: point.high,
+        low: point.low,
+        sma20: index >= 19 ? indicators.movingAverages.sma20 : null,
+        upperBB: indicators.bollingerBands.upper,
+        lowerBB: indicators.bollingerBands.lower,
+      };
+    });
+  }, [activeHistory, selectedRange, indicators]);
+
+  const currentPrice = activeHistory[activeHistory.length - 1]?.close || 0;
+  const startPrice = activeHistory[0]?.close || 0;
   const isPositive = currentPrice >= startPrice;
   const changePercent = startPrice > 0 ? ((currentPrice - startPrice) / startPrice * 100) : 0;
 
@@ -104,7 +127,12 @@ export function PriceChart({ priceHistory, indicators, commodityId }: PriceChart
         </div>
       </div>
       
-      <div className="h-64">
+      <div className="h-64 relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
