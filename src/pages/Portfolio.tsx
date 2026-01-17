@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { AddTradeDialog } from '@/components/AddTradeDialog';
+import { PortfolioCharts } from '@/components/PortfolioCharts';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrades, Trade } from '@/hooks/useTrades';
 import { useLivePrices } from '@/hooks/useLivePrices';
@@ -143,6 +144,13 @@ const Portfolio = () => {
             </p>
           </div>
         </div>
+
+        {/* Portfolio Charts */}
+        <PortfolioCharts 
+          trades={trades} 
+          positions={portfolioStats.positions} 
+          currentPrices={currentPrices} 
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Positions */}
