@@ -6,6 +6,7 @@ import { NotificationSettings } from '@/components/NotificationSettings';
 import { usePriceAlerts } from '@/hooks/usePriceAlerts';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { useAuth } from '@/hooks/useAuth';
+import { useServiceWorker } from '@/hooks/useServiceWorker';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,13 +21,23 @@ import {
   CheckCircle,
   BellOff,
   LogIn,
-  Settings
+  Settings,
+  Volume2,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function Alerts() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { commodities } = useLivePrices();
+  const { 
+    isSupported,
+    permissionState,
+    requestPermission,
+    showNotification
+  } = useServiceWorker();
+  const [isTesting, setIsTesting] = useState(false);
   const { 
     alerts, 
     isLoading: alertsLoading, 
@@ -49,6 +60,41 @@ export default function Alerts() {
       checkAlerts(currentPrices);
     }
   }, [commodities, alerts.length]);
+
+  // Test notification handler
+  const handleTestNotification = async () => {
+    setIsTesting(true);
+    
+    try {
+      // First ensure we have permission
+      if (permissionState !== 'granted') {
+        const granted = await requestPermission();
+        if (!granted) {
+          toast.error('Please allow notifications to test');
+          setIsTesting(false);
+          return;
+        }
+      }
+      
+      // Send test notification with sound
+      const success = await showNotification(
+        '🔔 Test Alert with Sound!',
+        'Push notifications are working! This should play a sound.',
+        { tag: 'test-notification-sound' }
+      );
+      
+      if (success) {
+        toast.success('Test notification sent with sound!');
+      } else {
+        toast.error('Failed to send notification');
+      }
+    } catch (error) {
+      console.error('Test notification error:', error);
+      toast.error('Failed to send test notification');
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   // Stats
   const activeAlerts = alerts.filter(a => a.is_active && !a.is_triggered);
@@ -112,7 +158,21 @@ export default function Alerts() {
             </p>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleTestNotification}
+              disabled={isTesting || !isSupported}
+              className="gap-2"
+            >
+              {isTesting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Volume2 className="w-4 h-4" />
+              )}
+              Test Sound
+            </Button>
             <Button 
               variant="outline" 
               size="sm"
