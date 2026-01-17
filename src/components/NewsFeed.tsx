@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Newspaper, TrendingUp, TrendingDown, Minus, RefreshCw, AlertCircle } from 'lucide-react';
+import { Newspaper, TrendingUp, TrendingDown, Minus, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface NewsItem {
   title: string;
   summary: string;
   sentiment: 'positive' | 'negative' | 'neutral';
   timestamp?: string;
+  details?: string;
 }
 
 interface NewsFeedProps {
@@ -20,6 +26,7 @@ export function NewsFeed({ assetName, assetSymbol }: NewsFeedProps) {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const fetchNews = async () => {
     setIsLoading(true);
@@ -71,6 +78,21 @@ export function NewsFeed({ assetName, assetSymbol }: NewsFeedProps) {
     }
   };
 
+  const getSentimentLabel = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive':
+        return { text: 'Bullish', color: 'text-success bg-success/10' };
+      case 'negative':
+        return { text: 'Bearish', color: 'text-destructive bg-destructive/10' };
+      default:
+        return { text: 'Neutral', color: 'text-muted-foreground bg-muted' };
+    }
+  };
+
+  const toggleExpanded = (index: number) => {
+    setExpandedIndex(expandedIndex === index ? null : index);
+  };
+
   return (
     <div className="glass-card rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
@@ -107,36 +129,98 @@ export function NewsFeed({ assetName, assetSymbol }: NewsFeedProps) {
         </div>
       ) : (
         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
-          {news.map((item, index) => (
-            <div
-              key={index}
-              className={cn(
-                "p-3 rounded-lg border transition-colors hover:bg-accent/50",
-                getSentimentBg(item.sentiment)
-              )}
-            >
-              <div className="flex items-start gap-2">
-                <div className="mt-0.5">
-                  {getSentimentIcon(item.sentiment)}
+          {news.map((item, index) => {
+            const isExpanded = expandedIndex === index;
+            const sentimentLabel = getSentimentLabel(item.sentiment);
+            
+            return (
+              <Collapsible
+                key={index}
+                open={isExpanded}
+                onOpenChange={() => toggleExpanded(index)}
+              >
+                <div
+                  className={cn(
+                    "rounded-lg border transition-all",
+                    getSentimentBg(item.sentiment),
+                    isExpanded && "ring-1 ring-primary/30"
+                  )}
+                >
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full p-3 text-left hover:bg-accent/30 transition-colors rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <div className="mt-0.5">
+                          {getSentimentIcon(item.sentiment)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <h4 className="font-medium text-sm text-foreground leading-tight flex-1">
+                              {item.title}
+                            </h4>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {item.timestamp && (
+                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                  {item.timestamp}
+                                </span>
+                              )}
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                              )}
+                            </div>
+                          </div>
+                          <p className={cn(
+                            "text-xs text-muted-foreground",
+                            !isExpanded && "line-clamp-2"
+                          )}>
+                            {item.summary}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent>
+                    <div className="px-3 pb-3 pt-1 border-t border-border/50 mt-1">
+                      <div className="space-y-3">
+                        {/* Sentiment Badge */}
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "text-xs px-2 py-1 rounded-full font-medium",
+                            sentimentLabel.color
+                          )}>
+                            {sentimentLabel.text} Sentiment
+                          </span>
+                        </div>
+                        
+                        {/* Full Summary */}
+                        <div>
+                          <h5 className="text-xs font-medium text-foreground mb-1">Summary</h5>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {item.summary}
+                          </p>
+                        </div>
+                        
+                        {/* Market Impact */}
+                        <div>
+                          <h5 className="text-xs font-medium text-foreground mb-1">Market Impact</h5>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {item.sentiment === 'positive' 
+                              ? `This news is generally considered bullish for ${assetName}. Traders may interpret this as a potential buying signal.`
+                              : item.sentiment === 'negative'
+                              ? `This news is generally considered bearish for ${assetName}. Traders may want to exercise caution or consider hedging positions.`
+                              : `This news has a neutral impact on ${assetName}. Market direction may depend on other factors.`
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <h4 className="font-medium text-sm text-foreground leading-tight flex-1">
-                      {item.title}
-                    </h4>
-                    {item.timestamp && (
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        {item.timestamp}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {item.summary}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
+              </Collapsible>
+            );
+          })}
         </div>
       )}
     </div>
