@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.fetch-asset-news]
 verify_jwt = false
+
+[functions.check-price-alerts]
+verify_jwt = false
+
+[functions.trading-assistant]
+verify_jwt = false
