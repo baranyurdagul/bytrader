@@ -8,6 +8,11 @@ import { PriceChart } from '@/components/PriceChart';
 import { SignalHistory } from '@/components/SignalHistory';
 import { NewsFeed } from '@/components/NewsFeed';
 import { AddAlertDialog } from '@/components/AddAlertDialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { usePriceAlerts } from '@/hooks/usePriceAlerts';
@@ -18,9 +23,33 @@ import {
   getTrendAnalysis,
   getCommodityData 
 } from '@/lib/tradingData';
-import { ArrowLeft, RefreshCw, Star, TrendingUp, TrendingDown, Bell } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Star, TrendingUp, TrendingDown, Bell, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+// Beginner-friendly explanations for quick stats
+const QUICK_STAT_HINTS = {
+  rsi: {
+    title: "RSI (Relative Strength Index)",
+    description: "Shows if an asset is overbought or oversold",
+    interpretation: "Below 30 = Oversold (might go up)\nAbove 70 = Overbought (might go down)\n30-70 = Neutral",
+  },
+  macd: {
+    title: "MACD Histogram",
+    description: "Shows momentum direction and strength",
+    interpretation: "Positive (green) = Bullish momentum\nNegative (red) = Bearish momentum\nBigger bars = Stronger trend",
+  },
+  atr: {
+    title: "ATR (Average True Range)",
+    description: "Measures how much price moves daily on average",
+    interpretation: "Higher ATR = More volatile (bigger swings)\nLower ATR = Less volatile (calmer)\nUseful for setting stop-losses",
+  },
+  adx: {
+    title: "ADX (Average Directional Index)",
+    description: "Measures trend strength (not direction)",
+    interpretation: "Below 25 = Weak or no trend\n25-50 = Strong trend\nAbove 50 = Very strong trend",
+  },
+};
 
 const AssetDetail = () => {
   const { assetId } = useParams<{ assetId: string }>();
@@ -183,32 +212,101 @@ const AssetDetail = () => {
               commodityId={selectedCommodity.id}
             />
             
-            {/* Quick Stats */}
+            {/* Quick Stats with Tooltips */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xs text-muted-foreground mb-1">RSI</p>
-                <p className="text-lg font-mono font-semibold text-foreground">
-                  {indicators.rsi.toFixed(1)}
-                </p>
-              </div>
-              <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xs text-muted-foreground mb-1">MACD</p>
-                <p className={`text-lg font-mono font-semibold ${indicators.macd.histogram > 0 ? 'text-success' : 'text-destructive'}`}>
-                  {indicators.macd.histogram > 0 ? '+' : ''}{indicators.macd.histogram.toFixed(3)}
-                </p>
-              </div>
-              <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xs text-muted-foreground mb-1">ATR</p>
-                <p className="text-lg font-mono font-semibold text-foreground">
-                  ${indicators.atr.toFixed(2)}
-                </p>
-              </div>
-              <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xs text-muted-foreground mb-1">ADX</p>
-                <p className="text-lg font-mono font-semibold text-foreground">
-                  {indicators.adx.toFixed(1)}
-                </p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="glass-card rounded-xl p-4 text-center cursor-help hover:ring-1 hover:ring-primary/30 transition-all">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      RSI
+                      <HelpCircle className="w-3 h-3" />
+                    </p>
+                    <p className={cn(
+                      "text-lg font-mono font-semibold",
+                      indicators.rsi < 30 ? "text-success" : indicators.rsi > 70 ? "text-destructive" : "text-foreground"
+                    )}>
+                      {indicators.rsi.toFixed(1)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {indicators.rsi < 30 ? "Oversold" : indicators.rsi > 70 ? "Overbought" : "Neutral"}
+                    </p>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[250px] p-3">
+                  <p className="font-semibold text-sm mb-1">{QUICK_STAT_HINTS.rsi.title}</p>
+                  <p className="text-xs text-muted-foreground mb-2">{QUICK_STAT_HINTS.rsi.description}</p>
+                  <p className="text-xs whitespace-pre-line text-primary">{QUICK_STAT_HINTS.rsi.interpretation}</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="glass-card rounded-xl p-4 text-center cursor-help hover:ring-1 hover:ring-primary/30 transition-all">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      MACD
+                      <HelpCircle className="w-3 h-3" />
+                    </p>
+                    <p className={cn(
+                      "text-lg font-mono font-semibold",
+                      indicators.macd.histogram > 0 ? "text-success" : "text-destructive"
+                    )}>
+                      {indicators.macd.histogram > 0 ? '+' : ''}{indicators.macd.histogram.toFixed(3)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {indicators.macd.histogram > 0 ? "Bullish" : "Bearish"}
+                    </p>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[250px] p-3">
+                  <p className="font-semibold text-sm mb-1">{QUICK_STAT_HINTS.macd.title}</p>
+                  <p className="text-xs text-muted-foreground mb-2">{QUICK_STAT_HINTS.macd.description}</p>
+                  <p className="text-xs whitespace-pre-line text-primary">{QUICK_STAT_HINTS.macd.interpretation}</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="glass-card rounded-xl p-4 text-center cursor-help hover:ring-1 hover:ring-primary/30 transition-all">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      ATR
+                      <HelpCircle className="w-3 h-3" />
+                    </p>
+                    <p className="text-lg font-mono font-semibold text-foreground">
+                      ${indicators.atr.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Daily Range
+                    </p>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[250px] p-3">
+                  <p className="font-semibold text-sm mb-1">{QUICK_STAT_HINTS.atr.title}</p>
+                  <p className="text-xs text-muted-foreground mb-2">{QUICK_STAT_HINTS.atr.description}</p>
+                  <p className="text-xs whitespace-pre-line text-primary">{QUICK_STAT_HINTS.atr.interpretation}</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="glass-card rounded-xl p-4 text-center cursor-help hover:ring-1 hover:ring-primary/30 transition-all">
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      ADX
+                      <HelpCircle className="w-3 h-3" />
+                    </p>
+                    <p className="text-lg font-mono font-semibold text-foreground">
+                      {indicators.adx.toFixed(1)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {indicators.adx < 25 ? "Weak Trend" : indicators.adx < 50 ? "Strong" : "Very Strong"}
+                    </p>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[250px] p-3">
+                  <p className="font-semibold text-sm mb-1">{QUICK_STAT_HINTS.adx.title}</p>
+                  <p className="text-xs text-muted-foreground mb-2">{QUICK_STAT_HINTS.adx.description}</p>
+                  <p className="text-xs whitespace-pre-line text-primary">{QUICK_STAT_HINTS.adx.interpretation}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* News Feed */}
