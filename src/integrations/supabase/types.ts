@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      trades: {
+        Row: {
+          asset_id: string
+          asset_name: string
+          asset_symbol: string
+          created_at: string
+          id: string
+          notes: string | null
+          price_per_unit: number
+          quantity: number
+          total_value: number
+          trade_date: string
+          trade_type: string
+          user_id: string
+        }
+        Insert: {
+          asset_id: string
+          asset_name: string
+          asset_symbol: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          price_per_unit: number
+          quantity: number
+          total_value: number
+          trade_date?: string
+          trade_type: string
+          user_id: string
+        }
+        Update: {
+          asset_id?: string
+          asset_name?: string
+          asset_symbol?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          price_per_unit?: number
+          quantity?: number
+          total_value?: number
+          trade_date?: string
+          trade_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
