@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { SignalCard } from '@/components/SignalCard';
@@ -7,8 +7,10 @@ import { TechnicalIndicatorsPanel } from '@/components/TechnicalIndicators';
 import { PriceChart } from '@/components/PriceChart';
 import { SignalHistory } from '@/components/SignalHistory';
 import { NewsFeed } from '@/components/NewsFeed';
+import { AddAlertDialog } from '@/components/AddAlertDialog';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { useWatchlist } from '@/hooks/useWatchlist';
+import { usePriceAlerts } from '@/hooks/usePriceAlerts';
 import { useAuth } from '@/hooks/useAuth';
 import { 
   getTechnicalIndicators, 
@@ -16,7 +18,7 @@ import {
   getTrendAnalysis,
   getCommodityData 
 } from '@/lib/tradingData';
-import { ArrowLeft, RefreshCw, Star, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Star, TrendingUp, TrendingDown, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +28,7 @@ const AssetDetail = () => {
   const { isAuthenticated } = useAuth();
   const { commodities: liveCommodities, isLoading, refetch } = useLivePrices(60000);
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
+  const { addAlert, checkAlerts, activeAlertsCount } = usePriceAlerts();
   
   const commodities = liveCommodities.length > 0 ? liveCommodities : getCommodityData();
   
@@ -48,6 +51,17 @@ const AssetDetail = () => {
     selectedCommodity ? getTrendAnalysis(selectedCommodity.priceHistory, selectedCommodity.price) : null,
     [selectedCommodity]
   );
+
+  // Check alerts when prices update
+  useEffect(() => {
+    if (commodities.length > 0) {
+      const priceMap = commodities.reduce((acc, c) => {
+        acc[c.id] = c.price;
+        return acc;
+      }, {} as Record<string, number>);
+      checkAlerts(priceMap);
+    }
+  }, [commodities, checkAlerts]);
 
   if (!selectedCommodity) {
     return (
@@ -121,18 +135,25 @@ const AssetDetail = () => {
             
             <div className="flex items-center gap-2">
               {isAuthenticated && (
-                <Button
-                  variant={isInWatchlist(selectedCommodity.id) ? "default" : "outline"}
-                  onClick={() => toggleWatchlist({
-                    asset_id: selectedCommodity.id,
-                    asset_name: selectedCommodity.name,
-                    asset_symbol: selectedCommodity.symbol,
-                  })}
-                  className="gap-2"
-                >
-                  <Star className={cn("w-4 h-4", isInWatchlist(selectedCommodity.id) && "fill-current")} />
-                  {isInWatchlist(selectedCommodity.id) ? 'In Watchlist' : 'Add to Watchlist'}
-                </Button>
+                <>
+                  <AddAlertDialog 
+                    commodities={commodities}
+                    onAddAlert={addAlert}
+                    selectedAssetId={selectedCommodity.id}
+                  />
+                  <Button
+                    variant={isInWatchlist(selectedCommodity.id) ? "default" : "outline"}
+                    onClick={() => toggleWatchlist({
+                      asset_id: selectedCommodity.id,
+                      asset_name: selectedCommodity.name,
+                      asset_symbol: selectedCommodity.symbol,
+                    })}
+                    className="gap-2"
+                  >
+                    <Star className={cn("w-4 h-4", isInWatchlist(selectedCommodity.id) && "fill-current")} />
+                    {isInWatchlist(selectedCommodity.id) ? 'In Watchlist' : 'Add to Watchlist'}
+                  </Button>
+                </>
               )}
               <Button 
                 variant="ghost" 
