@@ -174,26 +174,41 @@ function calculateBollingerBands(prices: number[], period: number = 20): { upper
 
 // Calculate Stochastic Oscillator
 function calculateStochastic(priceHistory: PricePoint[], period: number = 14): { k: number; d: number } {
+  if (!priceHistory || priceHistory.length < period) {
+    return { k: 50, d: 50 }; // Default neutral values
+  }
+  
   const recentData = priceHistory.slice(-period);
+  if (recentData.length === 0 || !recentData[recentData.length - 1]) {
+    return { k: 50, d: 50 };
+  }
+  
   const currentClose = recentData[recentData.length - 1].close;
   const lowestLow = Math.min(...recentData.map(p => p.low));
   const highestHigh = Math.max(...recentData.map(p => p.high));
   
-  const k = ((currentClose - lowestLow) / (highestHigh - lowestLow)) * 100;
+  const range = highestHigh - lowestLow;
+  const k = range === 0 ? 50 : ((currentClose - lowestLow) / range) * 100;
   
   // %D is 3-period SMA of %K
-  const kValues = [];
-  for (let i = 3; i <= period; i++) {
-    const slice = priceHistory.slice(-(period - i + 3), priceHistory.length - i + 3);
+  const kValues: number[] = [];
+  for (let i = 0; i < Math.min(3, priceHistory.length - period + 1); i++) {
+    const startIdx = priceHistory.length - period - i;
+    if (startIdx < 0) break;
+    
+    const slice = priceHistory.slice(startIdx, startIdx + period);
+    if (slice.length === 0 || !slice[slice.length - 1]) continue;
+    
     const close = slice[slice.length - 1].close;
     const low = Math.min(...slice.map(p => p.low));
     const high = Math.max(...slice.map(p => p.high));
-    kValues.push(((close - low) / (high - low)) * 100);
+    const sliceRange = high - low;
+    kValues.push(sliceRange === 0 ? 50 : ((close - low) / sliceRange) * 100);
   }
   
-  const d = kValues.slice(-3).reduce((a, b) => a + b, 0) / 3;
+  const d = kValues.length > 0 ? kValues.reduce((a, b) => a + b, 0) / kValues.length : k;
   
-  return { k, d };
+  return { k: isNaN(k) ? 50 : k, d: isNaN(d) ? 50 : d };
 }
 
 // Calculate ATR (Average True Range)
