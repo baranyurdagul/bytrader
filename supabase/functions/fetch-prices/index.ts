@@ -225,10 +225,10 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
 }
 
 function getMetalFallbackData(): PriceData[] {
-  // Realistic fallback prices with slight randomization
-  const goldBase = 2650 + (Math.random() - 0.5) * 30;
-  const silverBase = 31.5 + (Math.random() - 0.5) * 0.5;
-  const copperBase = 0.30 + (Math.random() - 0.5) * 0.02;
+  // Updated January 2026 prices with slight randomization
+  const goldBase = 4595 + (Math.random() - 0.5) * 50;
+  const silverBase = 88 + (Math.random() - 0.5) * 2;
+  const copperBase = 0.42 + (Math.random() - 0.5) * 0.02;
   
   return [
     {
