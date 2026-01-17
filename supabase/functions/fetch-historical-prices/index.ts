@@ -12,77 +12,83 @@ interface HistoricalPrice {
   volume: number;
 }
 
-// Fetch historical metal prices from Metals.dev (free tier: 30 day limit per request)
-async function fetchMetalHistory(metal: string, days: number = 30): Promise<HistoricalPrice[]> {
-  const apiKey = Deno.env.get('METALS_API_KEY');
-  
-  if (!apiKey) {
-    console.log('METALS_API_KEY not configured, using generated data');
-    return generateRealisticHistory(metal, days);
-  }
-  
+// Yahoo Finance tickers
+const YAHOO_TICKERS: Record<string, string> = {
+  gold: 'GC=F',
+  silver: 'SI=F',
+  copper: 'HG=F',
+  nasdaq100: '^NDX',
+  sp500: '^GSPC',
+};
+
+// Fetch historical data from Yahoo Finance
+async function fetchYahooHistory(ticker: string, days: number): Promise<HistoricalPrice[]> {
   try {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - Math.min(days, 30)); // Max 30 days for free tier
-    
-    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+    // Calculate date range
+    const endDate = Math.floor(Date.now() / 1000);
+    const startDate = endDate - (days * 24 * 60 * 60);
     
     const response = await fetch(
-      `https://api.metals.dev/v1/timeseries?api_key=${apiKey}&start_date=${formatDate(startDate)}&end_date=${formatDate(endDate)}`
+      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startDate}&period2=${endDate}&interval=1d`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      }
     );
     
     if (!response.ok) {
-      console.error('Metals.dev timeseries API error:', response.status);
-      return generateRealisticHistory(metal, days);
+      console.error(`Yahoo Finance history error for ${ticker}:`, response.status);
+      return [];
     }
     
     const data = await response.json();
-    console.log('Metals.dev timeseries status:', data.status);
+    const result = data?.chart?.result?.[0];
     
-    if (data.status !== 'success' || !data.rates) {
-      console.error('Metals.dev timeseries returned unexpected format');
-      return generateRealisticHistory(metal, days);
+    if (!result?.timestamp || !result?.indicators?.quote?.[0]) {
+      console.error(`No historical data for ${ticker}`);
+      return [];
     }
     
-    const history: HistoricalPrice[] = [];
-    const metalKey = metal.toLowerCase();
+    const timestamps = result.timestamp;
+    const quote = result.indicators.quote[0];
     
-    // Convert API data to our format
-    for (const [dateStr, rates] of Object.entries(data.rates)) {
-      const metals = (rates as any).metals;
-      if (metals && metals[metalKey]) {
-        const price = metals[metalKey];
-        const timestamp = new Date(dateStr).getTime();
-        
-        // Metals.dev only provides close price, estimate OHLC
+    const history: HistoricalPrice[] = [];
+    
+    for (let i = 0; i < timestamps.length; i++) {
+      if (quote.close[i] != null) {
         history.push({
-          timestamp,
-          open: price * (1 + (Math.random() - 0.5) * 0.005),
-          high: price * (1 + Math.random() * 0.008),
-          low: price * (1 - Math.random() * 0.008),
-          close: price,
-          volume: Math.floor(Math.random() * 500000) + 100000,
+          timestamp: timestamps[i] * 1000, // Convert to milliseconds
+          open: quote.open[i] || quote.close[i],
+          high: quote.high[i] || quote.close[i],
+          low: quote.low[i] || quote.close[i],
+          close: quote.close[i],
+          volume: quote.volume[i] || 0,
         });
       }
     }
     
-    // Sort by timestamp
-    history.sort((a, b) => a.timestamp - b.timestamp);
-    
-    // If we need more days than API provides, prepend generated data
-    if (days > 30 && history.length > 0) {
-      const oldestPrice = history[0].close;
-      const additionalDays = days - history.length;
-      const generatedHistory = generateRealisticHistory(metal, additionalDays, oldestPrice);
-      return [...generatedHistory, ...history];
-    }
-    
+    console.log(`Fetched ${history.length} historical points from Yahoo Finance for ${ticker}`);
     return history;
   } catch (error) {
-    console.error('Error fetching metal history:', error);
-    return generateRealisticHistory(metal, days);
+    console.error(`Error fetching Yahoo history for ${ticker}:`, error);
+    return [];
   }
+}
+
+// Fetch historical metal prices from Yahoo Finance
+async function fetchMetalHistory(metal: string, days: number = 365): Promise<HistoricalPrice[]> {
+  const ticker = YAHOO_TICKERS[metal];
+  
+  if (ticker) {
+    const history = await fetchYahooHistory(ticker, days);
+    if (history.length > 0) {
+      return history;
+    }
+  }
+  
+  console.log(`Using generated data for ${metal}`);
+  return generateRealisticHistory(metal, days);
 }
 
 // Fetch historical crypto prices from CoinGecko (free, supports 1 year)
@@ -120,26 +126,41 @@ async function fetchCryptoHistory(coinId: string, days: number = 365): Promise<H
   }
 }
 
-// Generate realistic price history based on asset type and current price ranges
+// Fetch historical index prices from Yahoo Finance
+async function fetchIndexHistory(indexId: string, days: number = 365): Promise<HistoricalPrice[]> {
+  const ticker = YAHOO_TICKERS[indexId];
+  
+  if (ticker) {
+    const history = await fetchYahooHistory(ticker, days);
+    if (history.length > 0) {
+      return history;
+    }
+  }
+  
+  console.log(`Using generated data for ${indexId}`);
+  return generateRealisticHistory(indexId, days);
+}
+
+// Generate realistic price history based on asset type and current price ranges (fallback)
+// Prices as of Jan 2026
 function generateRealisticHistory(assetId: string, days: number, endPrice?: number): HistoricalPrice[] {
   const history: HistoricalPrice[] = [];
   const now = Date.now();
   
-  // Realistic price ranges for each asset (using actual market data Jan 2025)
+  // Realistic price ranges for each asset
   const priceRanges: Record<string, { current: number; yearAgoRange: [number, number]; volatility: number }> = {
-    gold: { current: endPrice || 2650, yearAgoRange: [1950, 2050], volatility: 0.008 },
-    silver: { current: endPrice || 31.5, yearAgoRange: [22, 25], volatility: 0.012 },
-    copper: { current: endPrice || 4.25, yearAgoRange: [3.60, 4.00], volatility: 0.015 },
-    bitcoin: { current: endPrice || 95000, yearAgoRange: [40000, 45000], volatility: 0.04 },
-    ethereum: { current: endPrice || 3300, yearAgoRange: [2200, 2500], volatility: 0.045 },
-    nasdaq100: { current: endPrice || 21500, yearAgoRange: [16500, 17500], volatility: 0.015 },
-    sp500: { current: endPrice || 5900, yearAgoRange: [4700, 5000], volatility: 0.012 },
+    gold: { current: endPrice || 4500, yearAgoRange: [2600, 2750], volatility: 0.008 },
+    silver: { current: endPrice || 90, yearAgoRange: [30, 35], volatility: 0.012 },
+    copper: { current: endPrice || 5.50, yearAgoRange: [4.00, 4.50], volatility: 0.015 },
+    bitcoin: { current: endPrice || 95000, yearAgoRange: [40000, 50000], volatility: 0.04 },
+    ethereum: { current: endPrice || 3300, yearAgoRange: [2200, 2800], volatility: 0.045 },
+    nasdaq100: { current: endPrice || 21500, yearAgoRange: [16000, 18000], volatility: 0.015 },
+    sp500: { current: endPrice || 5900, yearAgoRange: [4800, 5200], volatility: 0.012 },
   };
   
   const config = priceRanges[assetId] || { current: endPrice || 100, yearAgoRange: [80, 120], volatility: 0.02 };
   
   // Calculate starting price based on how far back we're going
-  const yearProgress = Math.min(days / 365, 1);
   const startPrice = config.yearAgoRange[0] + Math.random() * (config.yearAgoRange[1] - config.yearAgoRange[0]);
   const priceTarget = config.current;
   
@@ -192,8 +213,9 @@ Deno.serve(async (req) => {
       history = await fetchCryptoHistory(assetId, days);
     } else if (category === 'metal') {
       history = await fetchMetalHistory(assetId, days);
+    } else if (category === 'index') {
+      history = await fetchIndexHistory(assetId, days);
     } else {
-      // Indices - use generated data for now
       history = generateRealisticHistory(assetId, days);
     }
     

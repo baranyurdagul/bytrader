@@ -20,6 +20,145 @@ interface PriceData {
   dataSource: 'live' | 'simulated';
 }
 
+// Yahoo Finance tickers for commodities and indices
+const YAHOO_TICKERS = {
+  gold: 'GC=F',      // Gold Futures
+  silver: 'SI=F',    // Silver Futures
+  copper: 'HG=F',    // Copper Futures
+  nasdaq100: '^NDX', // Nasdaq 100 Index
+  sp500: '^GSPC',    // S&P 500 Index
+};
+
+// Fetch quote from Yahoo Finance
+async function fetchYahooQuote(ticker: string): Promise<any | null> {
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      }
+    );
+    
+    if (!response.ok) {
+      console.error(`Yahoo Finance error for ${ticker}:`, response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    const result = data?.chart?.result?.[0];
+    
+    if (!result?.meta) {
+      console.error(`No data for ${ticker}`);
+      return null;
+    }
+    
+    const meta = result.meta;
+    const quote = result.indicators?.quote?.[0];
+    const lastIdx = quote?.close?.length - 1 || 0;
+    
+    return {
+      price: meta.regularMarketPrice || quote?.close?.[lastIdx],
+      previousClose: meta.chartPreviousClose || meta.previousClose,
+      high: quote?.high?.[lastIdx] || meta.regularMarketDayHigh,
+      low: quote?.low?.[lastIdx] || meta.regularMarketDayLow,
+      volume: meta.regularMarketVolume,
+    };
+  } catch (error) {
+    console.error(`Error fetching Yahoo quote for ${ticker}:`, error);
+    return null;
+  }
+}
+
+// Fetch metal prices from Yahoo Finance
+async function fetchMetalPrices(): Promise<PriceData[]> {
+  console.log('Fetching metal prices from Yahoo Finance...');
+  
+  const [goldQuote, silverQuote, copperQuote] = await Promise.all([
+    fetchYahooQuote(YAHOO_TICKERS.gold),
+    fetchYahooQuote(YAHOO_TICKERS.silver),
+    fetchYahooQuote(YAHOO_TICKERS.copper),
+  ]);
+  
+  const results: PriceData[] = [];
+  
+  if (goldQuote?.price) {
+    const change = goldQuote.price - (goldQuote.previousClose || goldQuote.price);
+    results.push({
+      id: 'gold',
+      name: 'Gold',
+      symbol: 'XAU/USD',
+      category: 'metal',
+      price: goldQuote.price,
+      priceUnit: '/oz',
+      change,
+      changePercent: goldQuote.previousClose ? (change / goldQuote.previousClose) * 100 : 0,
+      high24h: goldQuote.high || goldQuote.price,
+      low24h: goldQuote.low || goldQuote.price,
+      volume: formatVolume(goldQuote.volume || 125000),
+      marketCap: '$15.8T',
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'live',
+    });
+  }
+  
+  if (silverQuote?.price) {
+    const change = silverQuote.price - (silverQuote.previousClose || silverQuote.price);
+    results.push({
+      id: 'silver',
+      name: 'Silver',
+      symbol: 'XAG/USD',
+      category: 'metal',
+      price: silverQuote.price,
+      priceUnit: '/oz',
+      change,
+      changePercent: silverQuote.previousClose ? (change / silverQuote.previousClose) * 100 : 0,
+      high24h: silverQuote.high || silverQuote.price,
+      low24h: silverQuote.low || silverQuote.price,
+      volume: formatVolume(silverQuote.volume || 89000),
+      marketCap: '$1.4T',
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'live',
+    });
+  }
+  
+  if (copperQuote?.price) {
+    const change = copperQuote.price - (copperQuote.previousClose || copperQuote.price);
+    results.push({
+      id: 'copper',
+      name: 'Copper',
+      symbol: 'HG/USD',
+      category: 'metal',
+      price: copperQuote.price,
+      priceUnit: '/lb',
+      change,
+      changePercent: copperQuote.previousClose ? (change / copperQuote.previousClose) * 100 : 0,
+      high24h: copperQuote.high || copperQuote.price,
+      low24h: copperQuote.low || copperQuote.price,
+      volume: formatVolume(copperQuote.volume || 234000),
+      marketCap: '$320B',
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'live',
+    });
+  }
+  
+  // If Yahoo Finance failed, use fallback
+  if (results.length === 0) {
+    console.log('Yahoo Finance failed for metals, using fallback');
+    return getMetalFallbackData();
+  }
+  
+  // Fill in any missing metals with fallback
+  const fallback = getMetalFallbackData();
+  if (!results.find(r => r.id === 'gold')) results.push(fallback.find(f => f.id === 'gold')!);
+  if (!results.find(r => r.id === 'silver')) results.push(fallback.find(f => f.id === 'silver')!);
+  if (!results.find(r => r.id === 'copper')) results.push(fallback.find(f => f.id === 'copper')!);
+  
+  console.log(`Fetched ${results.filter(r => r.dataSource === 'live').length} live metal prices`);
+  return results;
+}
+
 // Fetch crypto prices from CoinGecko (free, no API key needed)
 async function fetchCryptoPrices(): Promise<PriceData[]> {
   try {
@@ -56,254 +195,77 @@ async function fetchCryptoPrices(): Promise<PriceData[]> {
   }
 }
 
-// Fetch metal prices from MetalpriceAPI (free tier: 250 req/month) with Metals.dev fallback
-async function fetchMetalPrices(): Promise<PriceData[]> {
-  // Try MetalpriceAPI first (better free tier)
-  const metalpriceApiKey = Deno.env.get('METALPRICEAPI_KEY');
-  if (metalpriceApiKey) {
-    try {
-      const response = await fetch(
-        `https://api.metalpriceapi.com/v1/latest?api_key=${metalpriceApiKey}&base=USD&currencies=XAU,XAG,XCU`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('MetalpriceAPI response:', JSON.stringify(data));
-        
-        if (data.success && data.rates) {
-          // MetalpriceAPI returns rates as 1/price (how much metal per 1 USD)
-          const goldPrice = data.rates.XAU ? 1 / data.rates.XAU : null;
-          const silverPrice = data.rates.XAG ? 1 / data.rates.XAG : null;
-          const copperPrice = data.rates.XCU ? 1 / data.rates.XCU : null;
-          
-          if (goldPrice && silverPrice) {
-            console.log('MetalpriceAPI prices - Gold:', goldPrice, 'Silver:', silverPrice);
-            
-            return [
-              {
-                id: 'gold',
-                name: 'Gold',
-                symbol: 'XAU/USD',
-                category: 'metal',
-                price: goldPrice,
-                priceUnit: '/oz',
-                change: (Math.random() - 0.5) * 40,
-                changePercent: (Math.random() - 0.5) * 1,
-                high24h: goldPrice * 1.005,
-                low24h: goldPrice * 0.995,
-                volume: '125.4K',
-                marketCap: '$15.8T',
-                lastUpdated: new Date().toISOString(),
-                dataSource: 'live',
-              },
-              {
-                id: 'silver',
-                name: 'Silver',
-                symbol: 'XAG/USD',
-                category: 'metal',
-                price: silverPrice,
-                priceUnit: '/oz',
-                change: (Math.random() - 0.5) * 2,
-                changePercent: (Math.random() - 0.5) * 2,
-                high24h: silverPrice * 1.008,
-                low24h: silverPrice * 0.992,
-                volume: '89.2K',
-                marketCap: '$4.2T',
-                lastUpdated: new Date().toISOString(),
-                dataSource: 'live',
-              },
-              {
-                id: 'copper',
-                name: 'Copper',
-                symbol: 'HG/USD',
-                category: 'metal',
-                price: copperPrice || 5.50,
-                priceUnit: '/lb',
-                change: (Math.random() - 0.5) * 0.08,
-                changePercent: (Math.random() - 0.5) * 2,
-                high24h: (copperPrice || 5.50) * 1.01,
-                low24h: (copperPrice || 5.50) * 0.99,
-                volume: '234.8K',
-                marketCap: '$320B',
-                lastUpdated: new Date().toISOString(),
-                dataSource: copperPrice ? 'live' : 'simulated',
-              },
-            ];
-          }
-        }
-      } else {
-        console.error('MetalpriceAPI error:', response.status, await response.text());
-      }
-    } catch (error) {
-      console.error('MetalpriceAPI fetch error:', error);
-    }
-  }
-  
-  // Fallback to Metals.dev
-  const metalsDevKey = Deno.env.get('METALS_API_KEY');
-  if (metalsDevKey) {
-    try {
-      const response = await fetch(
-        `https://api.metals.dev/v1/latest?api_key=${metalsDevKey}&currency=USD&unit=toz`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Metals.dev response:', JSON.stringify(data));
-        
-        if (data.metals) {
-          const goldPrice = data.metals.gold || 4500;
-          const silverPrice = data.metals.silver || 90;
-          const copperPrice = data.metals.copper ? data.metals.copper / 32150.7 : 5.50;
-          
-          return [
-            {
-              id: 'gold',
-              name: 'Gold',
-              symbol: 'XAU/USD',
-              category: 'metal',
-              price: goldPrice,
-              priceUnit: '/oz',
-              change: (Math.random() - 0.5) * 40,
-              changePercent: (Math.random() - 0.5) * 1,
-              high24h: goldPrice * 1.005,
-              low24h: goldPrice * 0.995,
-              volume: '125.4K',
-              marketCap: '$15.8T',
-              lastUpdated: new Date().toISOString(),
-              dataSource: 'live',
-            },
-            {
-              id: 'silver',
-              name: 'Silver',
-              symbol: 'XAG/USD',
-              category: 'metal',
-              price: silverPrice,
-              priceUnit: '/oz',
-              change: (Math.random() - 0.5) * 2,
-              changePercent: (Math.random() - 0.5) * 2,
-              high24h: silverPrice * 1.008,
-              low24h: silverPrice * 0.992,
-              volume: '89.2K',
-              marketCap: '$4.2T',
-              lastUpdated: new Date().toISOString(),
-              dataSource: 'live',
-            },
-            {
-              id: 'copper',
-              name: 'Copper',
-              symbol: 'HG/USD',
-              category: 'metal',
-              price: copperPrice,
-              priceUnit: '/lb',
-              change: (Math.random() - 0.5) * 0.08,
-              changePercent: (Math.random() - 0.5) * 2,
-              high24h: copperPrice * 1.01,
-              low24h: copperPrice * 0.99,
-              volume: '234.8K',
-              marketCap: '$320B',
-              lastUpdated: new Date().toISOString(),
-              dataSource: 'live',
-            },
-          ];
-        }
-      } else {
-        console.error('Metals.dev API error:', response.status, await response.text());
-      }
-    } catch (error) {
-      console.error('Metals.dev fetch error:', error);
-    }
-  }
-  
-  console.log('No metal API available, using fallback data');
-  return getMetalFallbackData();
-}
-
-// Fetch stock indices from Alpha Vantage or similar
+// Fetch indices from Yahoo Finance
 async function fetchIndicesPrices(): Promise<PriceData[]> {
-  try {
-    const apiKey = Deno.env.get('ALPHA_VANTAGE_API_KEY');
-    
-    if (!apiKey) {
-      console.log('ALPHA_VANTAGE_API_KEY not configured, using fallback data');
-      return getIndicesFallbackData();
-    }
-    
-    // Fetch Nasdaq 100 (QQQ ETF as proxy) and S&P 500 (SPY ETF as proxy)
-    const [nasdaqRes, spyRes] = await Promise.all([
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=QQQ&apikey=${apiKey}`),
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&apikey=${apiKey}`)
-    ]);
-    
-    const nasdaqData = await nasdaqRes.json();
-    const spyData = await spyRes.json();
-    
-    const results: PriceData[] = [];
-    
-    if (nasdaqData['Global Quote']) {
-      const quote = nasdaqData['Global Quote'];
-      const price = parseFloat(quote['05. price']) || 0;
-      const change = parseFloat(quote['09. change']) || 0;
-      const changePercent = parseFloat(quote['10. change percent']?.replace('%', '')) || 0;
-      
-      results.push({
-        id: 'nasdaq100',
-        name: 'Nasdaq 100',
-        symbol: 'NDX',
-        category: 'index',
-        price: price * 45,
-        priceUnit: '',
-        change: change * 45,
-        changePercent,
-        high24h: parseFloat(quote['03. high']) * 45 || price * 45,
-        low24h: parseFloat(quote['04. low']) * 45 || price * 45,
-        volume: '4.2B',
-        marketCap: '$25T',
-        lastUpdated: new Date().toISOString(),
-        dataSource: 'live',
-      });
-    }
-    
-    if (spyData['Global Quote']) {
-      const quote = spyData['Global Quote'];
-      const price = parseFloat(quote['05. price']) || 0;
-      const change = parseFloat(quote['09. change']) || 0;
-      const changePercent = parseFloat(quote['10. change percent']?.replace('%', '')) || 0;
-      
-      results.push({
-        id: 'sp500',
-        name: 'S&P 500',
-        symbol: 'SPX',
-        category: 'index',
-        price: price * 10,
-        priceUnit: '',
-        change: change * 10,
-        changePercent,
-        high24h: parseFloat(quote['03. high']) * 10 || price * 10,
-        low24h: parseFloat(quote['04. low']) * 10 || price * 10,
-        volume: '3.8B',
-        marketCap: '$42T',
-        lastUpdated: new Date().toISOString(),
-        dataSource: 'live',
-      });
-    }
-    
-    if (results.length === 0) {
-      return getIndicesFallbackData();
-    }
-    
-    return results;
-  } catch (error) {
-    console.error('Error fetching indices prices:', error);
+  console.log('Fetching indices from Yahoo Finance...');
+  
+  const [nasdaqQuote, sp500Quote] = await Promise.all([
+    fetchYahooQuote(YAHOO_TICKERS.nasdaq100),
+    fetchYahooQuote(YAHOO_TICKERS.sp500),
+  ]);
+  
+  const results: PriceData[] = [];
+  
+  if (nasdaqQuote?.price) {
+    const change = nasdaqQuote.price - (nasdaqQuote.previousClose || nasdaqQuote.price);
+    results.push({
+      id: 'nasdaq100',
+      name: 'Nasdaq 100',
+      symbol: 'NDX',
+      category: 'index',
+      price: nasdaqQuote.price,
+      priceUnit: '',
+      change,
+      changePercent: nasdaqQuote.previousClose ? (change / nasdaqQuote.previousClose) * 100 : 0,
+      high24h: nasdaqQuote.high || nasdaqQuote.price,
+      low24h: nasdaqQuote.low || nasdaqQuote.price,
+      volume: formatVolume(nasdaqQuote.volume || 4200000000),
+      marketCap: '$25T',
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'live',
+    });
+  }
+  
+  if (sp500Quote?.price) {
+    const change = sp500Quote.price - (sp500Quote.previousClose || sp500Quote.price);
+    results.push({
+      id: 'sp500',
+      name: 'S&P 500',
+      symbol: 'SPX',
+      category: 'index',
+      price: sp500Quote.price,
+      priceUnit: '',
+      change,
+      changePercent: sp500Quote.previousClose ? (change / sp500Quote.previousClose) * 100 : 0,
+      high24h: sp500Quote.high || sp500Quote.price,
+      low24h: sp500Quote.low || sp500Quote.price,
+      volume: formatVolume(sp500Quote.volume || 3800000000),
+      marketCap: '$42T',
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'live',
+    });
+  }
+  
+  if (results.length === 0) {
+    console.log('Yahoo Finance failed for indices, using fallback');
     return getIndicesFallbackData();
   }
+  
+  // Fill in missing indices
+  const fallback = getIndicesFallbackData();
+  if (!results.find(r => r.id === 'nasdaq100')) results.push(fallback.find(f => f.id === 'nasdaq100')!);
+  if (!results.find(r => r.id === 'sp500')) results.push(fallback.find(f => f.id === 'sp500')!);
+  
+  console.log(`Fetched ${results.filter(r => r.dataSource === 'live').length} live index prices`);
+  return results;
 }
 
-// Realistic fallback prices based on actual market data (January 2025)
+// Fallback prices (used when Yahoo Finance is unavailable)
+// Current prices as of Jan 2026
 function getMetalFallbackData(): PriceData[] {
-  const goldBase = 2650 + (Math.random() - 0.5) * 30;
-  const silverBase = 31.5 + (Math.random() - 0.5) * 1;
-  const copperBase = 4.25 + (Math.random() - 0.5) * 0.10;
+  const goldBase = 4500 + (Math.random() - 0.5) * 50;
+  const silverBase = 90 + (Math.random() - 0.5) * 3;
+  const copperBase = 5.50 + (Math.random() - 0.5) * 0.15;
   
   return [
     {
@@ -313,12 +275,12 @@ function getMetalFallbackData(): PriceData[] {
       category: 'metal',
       price: goldBase,
       priceUnit: '/oz',
-      change: (Math.random() - 0.5) * 25,
+      change: (Math.random() - 0.5) * 40,
       changePercent: (Math.random() - 0.5) * 1,
       high24h: goldBase * 1.005,
       low24h: goldBase * 0.995,
       volume: '125.4K',
-      marketCap: '$12.5T',
+      marketCap: '$15.8T',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
     },
@@ -329,7 +291,7 @@ function getMetalFallbackData(): PriceData[] {
       category: 'metal',
       price: silverBase,
       priceUnit: '/oz',
-      change: (Math.random() - 0.5) * 0.8,
+      change: (Math.random() - 0.5) * 2,
       changePercent: (Math.random() - 0.5) * 2,
       high24h: silverBase * 1.008,
       low24h: silverBase * 0.992,
@@ -345,12 +307,12 @@ function getMetalFallbackData(): PriceData[] {
       category: 'metal',
       price: copperBase,
       priceUnit: '/lb',
-      change: (Math.random() - 0.5) * 0.06,
+      change: (Math.random() - 0.5) * 0.08,
       changePercent: (Math.random() - 0.5) * 2,
       high24h: copperBase * 1.01,
       low24h: copperBase * 0.99,
       volume: '234.8K',
-      marketCap: '$245B',
+      marketCap: '$320B',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
     },
@@ -457,19 +419,20 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Fetching live prices from multiple sources...');
+    console.log('Fetching live prices from Yahoo Finance + CoinGecko...');
     
     // Fetch from all sources in parallel
-    const [cryptoPrices, metalPrices, indicesPrices] = await Promise.all([
-      fetchCryptoPrices(),
+    const [metalPrices, cryptoPrices, indicesPrices] = await Promise.all([
       fetchMetalPrices(),
+      fetchCryptoPrices(),
       fetchIndicesPrices(),
     ]);
     
     // Combine all prices
     const allPrices = [...metalPrices, ...cryptoPrices, ...indicesPrices];
     
-    console.log(`Fetched ${allPrices.length} prices successfully`);
+    const liveCount = allPrices.filter(p => p.dataSource === 'live').length;
+    console.log(`Fetched ${allPrices.length} prices (${liveCount} live, ${allPrices.length - liveCount} simulated)`);
     
     return new Response(
       JSON.stringify({ 
