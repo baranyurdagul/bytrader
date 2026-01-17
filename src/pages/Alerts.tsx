@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { AlertsList } from '@/components/AlertsList';
 import { AddAlertDialog } from '@/components/AddAlertDialog';
+import { NotificationSettings } from '@/components/NotificationSettings';
 import { usePriceAlerts } from '@/hooks/usePriceAlerts';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,7 +19,8 @@ import {
   Clock,
   CheckCircle,
   BellOff,
-  LogIn
+  LogIn,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -263,6 +265,9 @@ export default function Alerts() {
             )}
           </CardContent>
         </Card>
+
+        {/* Notification Settings */}
+        <NotificationSettings />
       </main>
     </div>
   );

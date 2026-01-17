@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 import { useServiceWorker } from './useServiceWorker';
+import { useNotificationPreferences } from './useNotificationPreferences';
 
 export interface PriceAlert {
   id: string;
@@ -33,6 +34,7 @@ export function usePriceAlerts() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { showNotification, requestPermission, permissionState, isSupported } = useServiceWorker();
+  const { preferences: notificationPrefs } = useNotificationPreferences();
   const notifiedAlertsRef = useRef<Set<string>>(new Set());
 
   const fetchAlerts = useCallback(async () => {
@@ -174,6 +176,26 @@ export function usePriceAlerts() {
     }
   }, []);
 
+  // Check if currently in quiet hours
+  const isInQuietHours = useCallback(() => {
+    if (!notificationPrefs?.quiet_hours_enabled) return false;
+    
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+    
+    const [startHour, startMin] = (notificationPrefs.quiet_hours_start || '22:00').split(':').map(Number);
+    const [endHour, endMin] = (notificationPrefs.quiet_hours_end || '08:00').split(':').map(Number);
+    
+    const startTime = startHour * 60 + startMin;
+    const endTime = endHour * 60 + endMin;
+    
+    // Handle overnight quiet hours (e.g., 22:00 to 08:00)
+    if (startTime > endTime) {
+      return currentTime >= startTime || currentTime < endTime;
+    }
+    return currentTime >= startTime && currentTime < endTime;
+  }, [notificationPrefs]);
+
   // Check alerts against current prices
   const checkAlerts = useCallback(async (currentPrices: Record<string, number>) => {
     const activeAlerts = alerts.filter(a => a.is_active && !a.is_triggered);
@@ -206,25 +228,34 @@ export function usePriceAlerts() {
           })
           .eq('id', alert.id);
 
-        // Show toast notification
-        toast({
-          title: `🔔 Price Alert: ${alert.asset_name}`,
-          description: `${alert.asset_symbol} is now ${alert.condition} $${targetPrice.toLocaleString()} (Current: $${currentPrice.toLocaleString()})`,
-          duration: 10000,
-        });
+        // Check quiet hours
+        const inQuietHours = isInQuietHours();
 
-        // Show push notification via service worker (works in background)
-        showNotification(
-          `🔔 Price Alert: ${alert.asset_name}`,
-          `${alert.asset_symbol} is now ${alert.condition} $${targetPrice.toLocaleString()} (Current: $${currentPrice.toLocaleString()})`,
-          {
-            tag: `alert-${alert.id}`,
-            alertId: alert.id
-          }
-        );
+        // Show toast notification (always show unless in quiet hours)
+        if (!inQuietHours) {
+          toast({
+            title: `🔔 Price Alert: ${alert.asset_name}`,
+            description: `${alert.asset_symbol} is now ${alert.condition} $${targetPrice.toLocaleString()} (Current: $${currentPrice.toLocaleString()})`,
+            duration: 10000,
+          });
+        }
 
-        // Send email notification
-        sendEmailNotification(alert, currentPrice);
+        // Show push notification via service worker (if enabled and not in quiet hours)
+        if (notificationPrefs?.push_enabled && !inQuietHours) {
+          showNotification(
+            `🔔 Price Alert: ${alert.asset_name}`,
+            `${alert.asset_symbol} is now ${alert.condition} $${targetPrice.toLocaleString()} (Current: $${currentPrice.toLocaleString()})`,
+            {
+              tag: `alert-${alert.id}`,
+              alertId: alert.id
+            }
+          );
+        }
+
+        // Send email notification (if enabled and not digest mode)
+        if (notificationPrefs?.email_enabled && !notificationPrefs?.email_digest) {
+          sendEmailNotification(alert, currentPrice);
+        }
       }
     }
 
@@ -233,7 +264,7 @@ export function usePriceAlerts() {
     }
 
     return triggeredAlerts;
-  }, [alerts, toast, fetchAlerts, sendEmailNotification, showNotification]);
+  }, [alerts, toast, fetchAlerts, sendEmailNotification, showNotification, notificationPrefs, isInQuietHours]);
 
   // Request notification permission using service worker
   const requestNotificationPermission = useCallback(async () => {
