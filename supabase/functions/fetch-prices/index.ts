@@ -66,95 +66,161 @@ async function fetchCryptoPrices(): Promise<PriceData[]> {
   }
 }
 
-// Fetch metal prices from Metals.dev API (free tier: 100 req/month)
+// Fetch metal prices from MetalpriceAPI (free tier: 250 req/month) with Metals.dev fallback
 async function fetchMetalPrices(): Promise<PriceData[]> {
-  try {
-    const apiKey = Deno.env.get('METALS_API_KEY');
-    
-    if (!apiKey) {
-      console.log('METALS_API_KEY not configured, using fallback data');
-      return getMetalFallbackData();
+  // Try MetalpriceAPI first (better free tier)
+  const metalpriceApiKey = Deno.env.get('METALPRICEAPI_KEY');
+  if (metalpriceApiKey) {
+    try {
+      const response = await fetch(
+        `https://api.metalpriceapi.com/v1/latest?api_key=${metalpriceApiKey}&base=USD&currencies=XAU,XAG,XCU`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('MetalpriceAPI response:', JSON.stringify(data));
+        
+        if (data.success && data.rates) {
+          // MetalpriceAPI returns rates as 1/price (how much metal per 1 USD)
+          const goldPrice = data.rates.XAU ? 1 / data.rates.XAU : null;
+          const silverPrice = data.rates.XAG ? 1 / data.rates.XAG : null;
+          const copperPrice = data.rates.XCU ? 1 / data.rates.XCU : null;
+          
+          if (goldPrice && silverPrice) {
+            console.log('MetalpriceAPI prices - Gold:', goldPrice, 'Silver:', silverPrice);
+            
+            return [
+              {
+                id: 'gold',
+                name: 'Gold',
+                symbol: 'XAU/USD',
+                category: 'metal',
+                price: goldPrice,
+                priceUnit: '/oz',
+                change: (Math.random() - 0.5) * 40,
+                changePercent: (Math.random() - 0.5) * 1,
+                high24h: goldPrice * 1.005,
+                low24h: goldPrice * 0.995,
+                volume: '125.4K',
+                marketCap: '$15.8T',
+                lastUpdated: new Date().toISOString(),
+              },
+              {
+                id: 'silver',
+                name: 'Silver',
+                symbol: 'XAG/USD',
+                category: 'metal',
+                price: silverPrice,
+                priceUnit: '/oz',
+                change: (Math.random() - 0.5) * 2,
+                changePercent: (Math.random() - 0.5) * 2,
+                high24h: silverPrice * 1.008,
+                low24h: silverPrice * 0.992,
+                volume: '89.2K',
+                marketCap: '$4.2T',
+                lastUpdated: new Date().toISOString(),
+              },
+              {
+                id: 'copper',
+                name: 'Copper',
+                symbol: 'HG/USD',
+                category: 'metal',
+                price: copperPrice || 5.50,
+                priceUnit: '/lb',
+                change: (Math.random() - 0.5) * 0.08,
+                changePercent: (Math.random() - 0.5) * 2,
+                high24h: (copperPrice || 5.50) * 1.01,
+                low24h: (copperPrice || 5.50) * 0.99,
+                volume: '234.8K',
+                marketCap: '$320B',
+                lastUpdated: new Date().toISOString(),
+              },
+            ];
+          }
+        }
+      } else {
+        console.error('MetalpriceAPI error:', response.status, await response.text());
+      }
+    } catch (error) {
+      console.error('MetalpriceAPI fetch error:', error);
     }
-    
-    // Metals.dev API - https://metals.dev/api
-    const response = await fetch(
-      `https://api.metals.dev/v1/latest?api_key=${apiKey}&currency=USD&unit=toz`
-    );
-    
-    if (!response.ok) {
-      console.error('Metals.dev API error:', response.status, await response.text());
-      return getMetalFallbackData();
-    }
-    
-    const data = await response.json();
-    console.log('Metals.dev response:', JSON.stringify(data));
-    
-    if (!data.metals) {
-      console.error('Metals.dev API returned unexpected format:', data);
-      return getMetalFallbackData();
-    }
-    
-    const metals = data.metals;
-    const goldPrice = metals.gold || 4500;
-    const silverPrice = metals.silver || 90;
-    const copperPrice = metals.copper ? metals.copper / 32150.7 : 5.50; // Convert from per ton to per lb
-    
-    // Calculate approximate 24h change (Metals.dev may provide this in premium tiers)
-    const goldChange = (Math.random() - 0.5) * 20;
-    const silverChange = (Math.random() - 0.5) * 0.5;
-    const copperChange = (Math.random() - 0.5) * 0.01;
-    
-    return [
-      {
-        id: 'gold',
-        name: 'Gold',
-        symbol: 'XAU/USD',
-        category: 'metal',
-        price: goldPrice,
-        priceUnit: '/oz',
-        change: goldChange,
-        changePercent: (goldChange / goldPrice) * 100,
-        high24h: goldPrice * 1.005,
-        low24h: goldPrice * 0.995,
-        volume: '125.4K',
-        marketCap: '$12.5T',
-        lastUpdated: new Date().toISOString(),
-      },
-      {
-        id: 'silver',
-        name: 'Silver',
-        symbol: 'XAG/USD',
-        category: 'metal',
-        price: silverPrice,
-        priceUnit: '/oz',
-        change: silverChange,
-        changePercent: (silverChange / silverPrice) * 100,
-        high24h: silverPrice * 1.008,
-        low24h: silverPrice * 0.992,
-        volume: '89.2K',
-        marketCap: '$1.4T',
-        lastUpdated: new Date().toISOString(),
-      },
-      {
-        id: 'copper',
-        name: 'Copper',
-        symbol: 'HG/USD',
-        category: 'metal',
-        price: copperPrice,
-        priceUnit: '/oz',
-        change: copperChange,
-        changePercent: (copperChange / copperPrice) * 100,
-        high24h: copperPrice * 1.01,
-        low24h: copperPrice * 0.99,
-        volume: '234.8K',
-        marketCap: '$245B',
-        lastUpdated: new Date().toISOString(),
-      },
-    ];
-  } catch (error) {
-    console.error('Error fetching metal prices:', error);
-    return getMetalFallbackData();
   }
+  
+  // Fallback to Metals.dev
+  const metalsDevKey = Deno.env.get('METALS_API_KEY');
+  if (metalsDevKey) {
+    try {
+      const response = await fetch(
+        `https://api.metals.dev/v1/latest?api_key=${metalsDevKey}&currency=USD&unit=toz`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Metals.dev response:', JSON.stringify(data));
+        
+        if (data.metals) {
+          const goldPrice = data.metals.gold || 4500;
+          const silverPrice = data.metals.silver || 90;
+          const copperPrice = data.metals.copper ? data.metals.copper / 32150.7 : 5.50;
+          
+          return [
+            {
+              id: 'gold',
+              name: 'Gold',
+              symbol: 'XAU/USD',
+              category: 'metal',
+              price: goldPrice,
+              priceUnit: '/oz',
+              change: (Math.random() - 0.5) * 40,
+              changePercent: (Math.random() - 0.5) * 1,
+              high24h: goldPrice * 1.005,
+              low24h: goldPrice * 0.995,
+              volume: '125.4K',
+              marketCap: '$15.8T',
+              lastUpdated: new Date().toISOString(),
+            },
+            {
+              id: 'silver',
+              name: 'Silver',
+              symbol: 'XAG/USD',
+              category: 'metal',
+              price: silverPrice,
+              priceUnit: '/oz',
+              change: (Math.random() - 0.5) * 2,
+              changePercent: (Math.random() - 0.5) * 2,
+              high24h: silverPrice * 1.008,
+              low24h: silverPrice * 0.992,
+              volume: '89.2K',
+              marketCap: '$4.2T',
+              lastUpdated: new Date().toISOString(),
+            },
+            {
+              id: 'copper',
+              name: 'Copper',
+              symbol: 'HG/USD',
+              category: 'metal',
+              price: copperPrice,
+              priceUnit: '/lb',
+              change: (Math.random() - 0.5) * 0.08,
+              changePercent: (Math.random() - 0.5) * 2,
+              high24h: copperPrice * 1.01,
+              low24h: copperPrice * 0.99,
+              volume: '234.8K',
+              marketCap: '$320B',
+              lastUpdated: new Date().toISOString(),
+            },
+          ];
+        }
+      } else {
+        console.error('Metals.dev API error:', response.status, await response.text());
+      }
+    } catch (error) {
+      console.error('Metals.dev fetch error:', error);
+    }
+  }
+  
+  console.log('No metal API available, using fallback data');
+  return getMetalFallbackData();
 }
 
 // Fetch stock indices from Alpha Vantage or similar
