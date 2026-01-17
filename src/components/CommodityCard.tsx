@@ -1,6 +1,7 @@
 import { CommodityData, formatPrice, formatChange, getCategoryIcon, getCategoryLabel } from '@/lib/tradingData';
-import { TrendingUp, TrendingDown, Minus, Star } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Star, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export type PriceUnit = 'oz' | 'gram';
 
@@ -104,6 +105,29 @@ export function CommodityCard({
               <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 {getCategoryLabel(commodity.category)}
               </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1",
+                    commodity.dataSource === 'live' 
+                      ? "bg-success/20 text-success" 
+                      : "bg-muted text-muted-foreground"
+                  )}>
+                    {commodity.dataSource === 'live' ? (
+                      <><Wifi className="w-2.5 h-2.5" /> Live</>
+                    ) : (
+                      <><WifiOff className="w-2.5 h-2.5" /> Sim</>
+                    )}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="text-xs">
+                    {commodity.dataSource === 'live' 
+                      ? "Real-time data from market API" 
+                      : "Simulated data (API unavailable)"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </div>

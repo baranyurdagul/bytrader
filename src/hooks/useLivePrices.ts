@@ -158,6 +158,7 @@ export function useLivePrices(refreshInterval: number = 60000) {
         volume: item.volume,
         marketCap: item.marketCap,
         priceHistory: generateFallbackHistory(item.id, item.category, 365),
+        dataSource: (item as any).dataSource || 'simulated',
       }));
       
       setCommodities(commodityData);
