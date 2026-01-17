@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
+import { useServiceWorker } from './useServiceWorker';
 
 export interface PriceAlert {
   id: string;
@@ -31,6 +32,7 @@ export function usePriceAlerts() {
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
+  const { showNotification, requestPermission, permissionState, isSupported } = useServiceWorker();
   const notifiedAlertsRef = useRef<Set<string>>(new Set());
 
   const fetchAlerts = useCallback(async () => {
@@ -211,13 +213,15 @@ export function usePriceAlerts() {
           duration: 10000,
         });
 
-        // Show browser notification if permitted
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(`Price Alert: ${alert.asset_name}`, {
-            body: `${alert.asset_symbol} is now ${alert.condition} $${targetPrice.toLocaleString()}`,
-            icon: '/favicon.ico',
-          });
-        }
+        // Show push notification via service worker (works in background)
+        showNotification(
+          `🔔 Price Alert: ${alert.asset_name}`,
+          `${alert.asset_symbol} is now ${alert.condition} $${targetPrice.toLocaleString()} (Current: $${currentPrice.toLocaleString()})`,
+          {
+            tag: `alert-${alert.id}`,
+            alertId: alert.id
+          }
+        );
 
         // Send email notification
         sendEmailNotification(alert, currentPrice);
@@ -229,29 +233,33 @@ export function usePriceAlerts() {
     }
 
     return triggeredAlerts;
-  }, [alerts, toast, fetchAlerts, sendEmailNotification]);
+  }, [alerts, toast, fetchAlerts, sendEmailNotification, showNotification]);
 
-  // Request notification permission
+  // Request notification permission using service worker
   const requestNotificationPermission = useCallback(async () => {
-    if (!('Notification' in window)) {
+    if (!isSupported) {
       toast({
         title: "Not Supported",
-        description: "Browser notifications are not supported",
+        description: "Push notifications are not supported in this browser",
         variant: "destructive",
       });
       return false;
     }
 
-    if (Notification.permission === 'granted') {
+    if (permissionState === 'granted') {
+      toast({
+        title: "Already Enabled",
+        description: "Push notifications are already enabled",
+      });
       return true;
     }
 
-    const permission = await Notification.requestPermission();
+    const granted = await requestPermission();
     
-    if (permission === 'granted') {
+    if (granted) {
       toast({
-        title: "Notifications Enabled",
-        description: "You'll receive browser notifications for price alerts",
+        title: "Push Notifications Enabled",
+        description: "You'll receive notifications even when this tab is in the background",
       });
       return true;
     } else {
@@ -262,7 +270,7 @@ export function usePriceAlerts() {
       });
       return false;
     }
-  }, [toast]);
+  }, [toast, isSupported, permissionState, requestPermission]);
 
   return {
     alerts,
