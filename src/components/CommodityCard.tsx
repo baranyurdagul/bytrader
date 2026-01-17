@@ -1,5 +1,5 @@
 import { CommodityData, formatPrice, formatChange, getCategoryIcon, getCategoryLabel } from '@/lib/tradingData';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type PriceUnit = 'oz' | 'gram';
@@ -12,9 +12,20 @@ interface CommodityCardProps {
   isSelected: boolean;
   onClick: () => void;
   priceUnit?: PriceUnit;
+  isInWatchlist?: boolean;
+  onToggleWatchlist?: () => void;
+  showWatchlistButton?: boolean;
 }
 
-export function CommodityCard({ commodity, isSelected, onClick, priceUnit = 'oz' }: CommodityCardProps) {
+export function CommodityCard({ 
+  commodity, 
+  isSelected, 
+  onClick, 
+  priceUnit = 'oz',
+  isInWatchlist = false,
+  onToggleWatchlist,
+  showWatchlistButton = false
+}: CommodityCardProps) {
   const isPositive = commodity.change >= 0;
   const TrendIcon = commodity.change > 0 ? TrendingUp : commodity.change < 0 ? TrendingDown : Minus;
   
@@ -96,10 +107,29 @@ export function CommodityCard({ commodity, isSelected, onClick, priceUnit = 'oz'
             </div>
           </div>
         </div>
-        <TrendIcon className={cn(
-          "w-5 h-5 transition-transform group-hover:scale-110",
-          isPositive ? "text-success" : "text-destructive"
-        )} />
+        <div className="flex items-center gap-2">
+          {showWatchlistButton && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleWatchlist?.();
+              }}
+              className={cn(
+                "p-1 rounded-md transition-colors",
+                isInWatchlist 
+                  ? "text-yellow-500 hover:text-yellow-400" 
+                  : "text-muted-foreground hover:text-yellow-500"
+              )}
+              title={isInWatchlist ? "Remove from watchlist" : "Add to watchlist"}
+            >
+              <Star className={cn("w-5 h-5", isInWatchlist && "fill-current")} />
+            </button>
+          )}
+          <TrendIcon className={cn(
+            "w-5 h-5 transition-transform group-hover:scale-110",
+            isPositive ? "text-success" : "text-destructive"
+          )} />
+        </div>
       </div>
       
       <div className="space-y-2">
