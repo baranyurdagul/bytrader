@@ -2,12 +2,32 @@ import { useState, useCallback } from 'react';
 
 type Message = { role: 'user' | 'assistant'; content: string };
 
+export interface PortfolioContext {
+  positions: Array<{
+    asset_name: string;
+    asset_symbol: string;
+    quantity: number;
+    averageBuyPrice: number;
+    currentValue: number;
+    profitLoss: number;
+    profitLossPercent: number;
+  }>;
+  totalValue: number;
+  totalProfitLoss: number;
+  totalProfitLossPercent: number;
+}
+
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trading-assistant`;
 
 export function useStreamingChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [portfolioContext, setPortfolioContext] = useState<PortfolioContext | null>(null);
+
+  const updatePortfolioContext = useCallback((context: PortfolioContext | null) => {
+    setPortfolioContext(context);
+  }, []);
 
   const sendMessage = useCallback(async (input: string) => {
     const userMsg: Message = { role: 'user', content: input };
@@ -35,7 +55,7 @@ export function useStreamingChat() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: [...messages, userMsg] }),
+        body: JSON.stringify({ messages: [...messages, userMsg], portfolio: portfolioContext }),
       });
 
       if (!resp.ok) {
@@ -104,12 +124,12 @@ export function useStreamingChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [messages]);
+  }, [messages, portfolioContext]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);
     setError(null);
   }, []);
 
-  return { messages, isLoading, error, sendMessage, clearMessages };
+  return { messages, isLoading, error, sendMessage, clearMessages, updatePortfolioContext };
 }

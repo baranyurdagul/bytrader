@@ -3,22 +3,57 @@ import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, Send, TrendingUp, AlertCircle, Lightbulb, BarChart3, Trash2 } from 'lucide-react';
+import { Bot, Send, TrendingUp, AlertCircle, Lightbulb, BarChart3, Trash2, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStreamingChat } from '@/hooks/useStreamingChat';
+import { useTrades } from '@/hooks/useTrades';
+import { useLivePrices } from '@/hooks/useLivePrices';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
-const quickActions = [
-  { icon: TrendingUp, label: 'Market Analysis', prompt: 'Give me a quick market analysis for gold and silver' },
-  { icon: AlertCircle, label: 'Risk Assessment', prompt: 'What are the current risks in the precious metals market?' },
-  { icon: Lightbulb, label: 'Trading Ideas', prompt: 'Suggest some trading opportunities based on current market conditions' },
-  { icon: BarChart3, label: 'Technical View', prompt: 'What do the technical indicators suggest for gold right now?' },
-];
-
 export default function Assistant() {
-  const { messages, isLoading, error, sendMessage, clearMessages } = useStreamingChat();
+  const { messages, isLoading, error, sendMessage, clearMessages, updatePortfolioContext } = useStreamingChat();
+  const { user } = useAuth();
+  const { trades, calculatePortfolioStats } = useTrades();
+  const { commodities } = useLivePrices();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Build price map and update portfolio context
+  useEffect(() => {
+    if (!user || trades.length === 0) {
+      updatePortfolioContext(null);
+      return;
+    }
+
+    const priceMap: Record<string, number> = {};
+    commodities.forEach(p => { priceMap[p.id] = p.price; });
+    
+    const stats = calculatePortfolioStats(priceMap);
+    updatePortfolioContext({
+      positions: stats.positions.map(p => ({
+        asset_name: p.asset_name,
+        asset_symbol: p.asset_symbol,
+        quantity: p.quantity,
+        averageBuyPrice: p.averageBuyPrice,
+        currentValue: p.currentValue,
+        profitLoss: p.profitLoss,
+        profitLossPercent: p.profitLossPercent,
+      })),
+      totalValue: stats.totalValue,
+      totalProfitLoss: stats.totalProfitLoss,
+      totalProfitLossPercent: stats.totalProfitLossPercent,
+    });
+  }, [user, trades, commodities, calculatePortfolioStats, updatePortfolioContext]);
+
+  const hasPortfolio = user && trades.length > 0;
+
+  const quickActions = [
+    { icon: TrendingUp, label: 'Market Analysis', prompt: 'Give me a quick market analysis for gold and silver' },
+    { icon: AlertCircle, label: 'Risk Assessment', prompt: 'What are the current risks in the precious metals market?' },
+    ...(hasPortfolio ? [{ icon: Wallet, label: 'Portfolio Review', prompt: 'Analyze my current portfolio and suggest improvements' }] : []),
+    { icon: BarChart3, label: 'Technical View', prompt: 'What do the technical indicators suggest for gold right now?' },
+  ];
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
