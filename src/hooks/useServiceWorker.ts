@@ -55,36 +55,59 @@ export function useServiceWorker() {
       alertId?: string;
     }
   ) => {
-    if (!isSupported || permissionState !== 'granted') {
-      console.warn('Notifications not available or not permitted');
+    if (!isSupported) {
+      console.warn('Notifications not supported');
       return false;
+    }
+
+    // Request permission if not granted
+    if (permissionState !== 'granted') {
+      const granted = await requestPermission();
+      if (!granted) {
+        console.warn('Notification permission not granted');
+        return false;
+      }
     }
 
     try {
-      // Try to use service worker for notification (works in background)
-      if (registration?.active) {
-        registration.active.postMessage({
-          type: 'SHOW_NOTIFICATION',
-          title,
-          body,
-          tag: options?.tag,
-          alertId: options?.alertId
-        });
-        return true;
-      }
-
-      // Fallback to regular notification
-      new Notification(title, {
+      // Wait for service worker to be ready
+      const reg = await navigator.serviceWorker.ready;
+      
+      // Use service worker's showNotification directly for reliability
+      await reg.showNotification(title, {
         body,
         icon: '/favicon.ico',
-        tag: options?.tag
-      });
+        badge: '/favicon.ico',
+        vibrate: [300, 100, 300, 100, 300],
+        tag: options?.tag || 'price-alert',
+        renotify: true,
+        requireInteraction: true,
+        silent: false,
+        data: {
+          url: '/',
+          alertId: options?.alertId
+        }
+      } as NotificationOptions);
+      
+      console.log('Notification shown successfully');
       return true;
     } catch (error) {
       console.error('Error showing notification:', error);
-      return false;
+      
+      // Fallback to regular Notification API
+      try {
+        new Notification(title, {
+          body,
+          icon: '/favicon.ico',
+          tag: options?.tag
+        });
+        return true;
+      } catch (fallbackError) {
+        console.error('Fallback notification also failed:', fallbackError);
+        return false;
+      }
     }
-  }, [isSupported, permissionState, registration]);
+  }, [isSupported, permissionState, requestPermission]);
 
   return {
     isSupported,
