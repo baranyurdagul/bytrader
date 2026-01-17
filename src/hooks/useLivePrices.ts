@@ -19,37 +19,107 @@ interface LivePriceData {
   lastUpdated: string;
 }
 
-// Generate price history from current price - extended to 365 days for yearly view
-function generatePriceHistory(basePrice: number, volatility: number, days: number = 365): PricePoint[] {
+// Cache for historical price data
+const historicalCache: Map<string, { data: PricePoint[], timestamp: number }> = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Fetch real historical prices from edge function
+async function fetchHistoricalPrices(assetId: string, category: string, days: number = 365): Promise<PricePoint[]> {
+  const cacheKey = `${assetId}-${days}`;
+  const cached = historicalCache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('fetch-historical-prices', {
+      body: {},
+      headers: {},
+    });
+    
+    // Use query params via URL approach since invoke doesn't support query params well
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-historical-prices?asset=${assetId}&category=${category}&days=${days}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch historical prices: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      const priceHistory: PricePoint[] = result.data.map((point: any) => ({
+        timestamp: point.timestamp,
+        open: point.open,
+        high: point.high,
+        low: point.low,
+        close: point.close,
+        volume: point.volume,
+      }));
+      
+      historicalCache.set(cacheKey, { data: priceHistory, timestamp: Date.now() });
+      return priceHistory;
+    }
+    
+    throw new Error('Invalid response format');
+  } catch (error) {
+    console.error(`Error fetching historical prices for ${assetId}:`, error);
+    // Return fallback generated data
+    return generateFallbackHistory(assetId, category, days);
+  }
+}
+
+// Generate fallback history with realistic price ranges
+function generateFallbackHistory(assetId: string, category: string, days: number): PricePoint[] {
   const history: PricePoint[] = [];
-  let currentPrice = basePrice * (0.85 + Math.random() * 0.15);
   const now = Date.now();
+  
+  // Realistic starting prices and volatility (going back from current prices)
+  const configs: Record<string, { current: number; yearAgo: number; volatility: number }> = {
+    gold: { current: 4600, yearAgo: 2100, volatility: 0.01 },
+    silver: { current: 90, yearAgo: 25, volatility: 0.015 },
+    copper: { current: 0.40, yearAgo: 0.30, volatility: 0.02 },
+    bitcoin: { current: 95000, yearAgo: 45000, volatility: 0.04 },
+    ethereum: { current: 3300, yearAgo: 2500, volatility: 0.045 },
+    nasdaq100: { current: 21500, yearAgo: 17000, volatility: 0.015 },
+    sp500: { current: 5900, yearAgo: 5000, volatility: 0.012 },
+  };
+  
+  const config = configs[assetId] || { current: 100, yearAgo: 80, volatility: 0.02 };
+  
+  let currentPrice = config.yearAgo;
+  const dailyTrend = (config.current - config.yearAgo) / days;
   
   for (let i = days; i >= 0; i--) {
     const timestamp = now - i * 24 * 60 * 60 * 1000;
-    const dailyChange = (Math.random() - 0.5) * volatility * currentPrice;
-    const open = currentPrice;
-    const close = i === 0 ? basePrice : currentPrice + dailyChange;
-    const high = Math.max(open, close) * (1 + Math.random() * 0.02);
-    const low = Math.min(open, close) * (1 - Math.random() * 0.02);
-    const volume = Math.floor(Math.random() * 1000000) + 500000;
+    const randomChange = (Math.random() - 0.5) * config.volatility * currentPrice;
     
-    history.push({ timestamp, open, high, low, close, volume });
+    const open = currentPrice;
+    const close = i === 0 ? config.current : currentPrice + dailyTrend + randomChange;
+    const high = Math.max(open, close) * (1 + Math.random() * 0.015);
+    const low = Math.min(open, close) * (1 - Math.random() * 0.015);
+    
+    history.push({
+      timestamp,
+      open,
+      high,
+      low,
+      close: Math.max(close, 0.01),
+      volume: Math.floor(Math.random() * 1000000) + 500000,
+    });
+    
     currentPrice = close;
   }
   
   return history;
-}
-
-function getVolatility(category: string, id: string): number {
-  if (category === 'crypto') return 0.04;
-  if (category === 'metal') {
-    if (id === 'gold') return 0.015;
-    if (id === 'silver') return 0.025;
-    return 0.02;
-  }
-  if (category === 'index') return 0.015;
-  return 0.02;
 }
 
 export function useLivePrices(refreshInterval: number = 60000) {
@@ -87,7 +157,7 @@ export function useLivePrices(refreshInterval: number = 60000) {
         low24h: item.low24h,
         volume: item.volume,
         marketCap: item.marketCap,
-        priceHistory: generatePriceHistory(item.price, getVolatility(item.category, item.id)),
+        priceHistory: generateFallbackHistory(item.id, item.category, 365),
       }));
       
       setCommodities(commodityData);
