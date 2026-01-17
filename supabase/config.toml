@@ -1,1 +1,7 @@
 project_id = "cwsyyvzupybueberirgu"
+
+[functions.fetch-prices]
+verify_jwt = false
+
+[functions.send-alert-email]
+verify_jwt = false
