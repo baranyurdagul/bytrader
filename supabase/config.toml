@@ -1,5 +1,8 @@
 project_id = "cwsyyvzupybueberirgu"
 
+[functions.send-push-notification]
+verify_jwt = false
+
 [functions.fetch-prices]
 verify_jwt = false
 
