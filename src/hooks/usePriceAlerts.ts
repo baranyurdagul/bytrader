@@ -143,6 +143,35 @@ export function usePriceAlerts() {
     }
   }, [fetchAlerts]);
 
+  // Send email notification
+  const sendEmailNotification = useCallback(async (
+    alert: PriceAlert,
+    currentPrice: number
+  ) => {
+    try {
+      console.log('Sending email notification for alert:', alert.id);
+      
+      const { data, error } = await supabase.functions.invoke('send-alert-email', {
+        body: {
+          alertId: alert.id,
+          assetName: alert.asset_name,
+          assetSymbol: alert.asset_symbol,
+          condition: alert.condition,
+          targetPrice: Number(alert.target_price),
+          currentPrice,
+        },
+      });
+
+      if (error) {
+        console.error('Error sending email notification:', error);
+      } else {
+        console.log('Email notification sent successfully:', data);
+      }
+    } catch (error) {
+      console.error('Error invoking send-alert-email function:', error);
+    }
+  }, []);
+
   // Check alerts against current prices
   const checkAlerts = useCallback(async (currentPrices: Record<string, number>) => {
     const activeAlerts = alerts.filter(a => a.is_active && !a.is_triggered);
@@ -189,6 +218,9 @@ export function usePriceAlerts() {
             icon: '/favicon.ico',
           });
         }
+
+        // Send email notification
+        sendEmailNotification(alert, currentPrice);
       }
     }
 
@@ -197,7 +229,7 @@ export function usePriceAlerts() {
     }
 
     return triggeredAlerts;
-  }, [alerts, toast, fetchAlerts]);
+  }, [alerts, toast, fetchAlerts, sendEmailNotification]);
 
   // Request notification permission
   const requestNotificationPermission = useCallback(async () => {
