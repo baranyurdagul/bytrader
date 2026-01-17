@@ -194,12 +194,10 @@ function AlertRow({
         </div>
 
         <div className="flex items-center gap-2">
-          {!alert.is_triggered && (
-            <Switch
-              checked={alert.is_active}
-              onCheckedChange={(checked) => onToggle(alert.id, checked)}
-            />
-          )}
+          <Switch
+            checked={alert.is_active}
+            onCheckedChange={(checked) => onToggle(alert.id, checked)}
+          />
           <Button
             variant="ghost"
             size="icon"
