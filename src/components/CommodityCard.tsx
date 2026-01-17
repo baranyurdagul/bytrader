@@ -2,15 +2,31 @@ import { CommodityData, formatPrice, formatChange, getCategoryIcon, getCategoryL
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+export type PriceUnit = 'oz' | 'gram';
+
+// Troy ounce to grams conversion
+export const OZ_TO_GRAM = 31.1035;
+
 interface CommodityCardProps {
   commodity: CommodityData;
   isSelected: boolean;
   onClick: () => void;
+  priceUnit?: PriceUnit;
 }
 
-export function CommodityCard({ commodity, isSelected, onClick }: CommodityCardProps) {
+export function CommodityCard({ commodity, isSelected, onClick, priceUnit = 'oz' }: CommodityCardProps) {
   const isPositive = commodity.change >= 0;
   const TrendIcon = commodity.change > 0 ? TrendingUp : commodity.change < 0 ? TrendingDown : Minus;
+  
+  // Only convert metals
+  const isMetal = commodity.category === 'metal';
+  const conversionFactor = isMetal && priceUnit === 'gram' ? 1 / OZ_TO_GRAM : 1;
+  
+  const displayPrice = commodity.price * conversionFactor;
+  const displayChange = commodity.change * conversionFactor;
+  const displayHigh = commodity.high24h * conversionFactor;
+  const displayLow = commodity.low24h * conversionFactor;
+  const displayUnit = isMetal ? (priceUnit === 'gram' ? '/g' : '/oz') : commodity.priceUnit;
   
   const getGradientClass = () => {
     switch (commodity.id) {
@@ -39,12 +55,14 @@ export function CommodityCard({ commodity, isSelected, onClick }: CommodityCardP
   };
 
   const formatDisplayPrice = () => {
-    if (commodity.price >= 1000) {
-      return formatPrice(commodity.price, 2);
-    } else if (commodity.price >= 10) {
-      return formatPrice(commodity.price, 2);
+    if (displayPrice >= 1000) {
+      return formatPrice(displayPrice, 2);
+    } else if (displayPrice >= 10) {
+      return formatPrice(displayPrice, 2);
+    } else if (displayPrice >= 1) {
+      return formatPrice(displayPrice, 3);
     } else {
-      return formatPrice(commodity.price, 4);
+      return formatPrice(displayPrice, 4);
     }
   };
 
@@ -87,9 +105,9 @@ export function CommodityCard({ commodity, isSelected, onClick }: CommodityCardP
       <div className="space-y-2">
         <p className="text-2xl font-bold font-mono text-foreground">
           ${formatDisplayPrice()}
-          {commodity.priceUnit && (
+          {displayUnit && (
             <span className="text-sm font-normal text-muted-foreground ml-1">
-              {commodity.priceUnit}
+              {displayUnit}
             </span>
           )}
         </p>
@@ -97,18 +115,18 @@ export function CommodityCard({ commodity, isSelected, onClick }: CommodityCardP
           "text-sm font-medium font-mono",
           isPositive ? "text-success" : "text-destructive"
         )}>
-          {formatChange(commodity.change, commodity.changePercent)}
+          {formatChange(displayChange, commodity.changePercent)}
         </p>
       </div>
       
       <div className="mt-4 pt-4 border-t border-border/50 grid grid-cols-2 gap-4">
         <div>
           <p className="text-xs text-muted-foreground">24h High</p>
-          <p className="text-sm font-mono text-foreground">${formatPrice(commodity.high24h, commodity.price < 10 ? 4 : 2)}</p>
+          <p className="text-sm font-mono text-foreground">${formatPrice(displayHigh, displayPrice < 10 ? 4 : 2)}</p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">24h Low</p>
-          <p className="text-sm font-mono text-foreground">${formatPrice(commodity.low24h, commodity.price < 10 ? 4 : 2)}</p>
+          <p className="text-sm font-mono text-foreground">${formatPrice(displayLow, displayPrice < 10 ? 4 : 2)}</p>
         </div>
       </div>
     </button>

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Header } from '@/components/Header';
-import { CommodityCard } from '@/components/CommodityCard';
+import { CommodityCard, PriceUnit } from '@/components/CommodityCard';
 import { SignalCard } from '@/components/SignalCard';
 import { TrendMeter } from '@/components/TrendMeter';
 import { TechnicalIndicatorsPanel } from '@/components/TechnicalIndicators';
@@ -17,10 +17,11 @@ import {
   getTrendAnalysis,
   getCommodityData 
 } from '@/lib/tradingData';
-import { RefreshCw, Wifi, WifiOff, Bell, BellRing } from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff, Bell, BellRing, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ const Index = () => {
   } = usePriceAlerts();
   const [selectedCommodityId, setSelectedCommodityId] = useState('gold');
   const [showAlerts, setShowAlerts] = useState(false);
+  const [metalPriceUnit, setMetalPriceUnit] = useState<PriceUnit>('oz');
   
   // Fall back to simulated data if live data is not available
   const commodities = liveCommodities.length > 0 ? liveCommodities : getCommodityData();
@@ -197,9 +199,33 @@ const Index = () => {
 
         {/* Metals Section */}
         <section className="mb-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            🏆 Precious Metals <span className="text-xs text-muted-foreground font-normal">(price per troy ounce)</span>
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              🏆 Precious Metals
+            </h2>
+            <div className="flex items-center gap-2">
+              <Scale className="w-4 h-4 text-muted-foreground" />
+              <ToggleGroup
+                type="single"
+                value={metalPriceUnit}
+                onValueChange={(value) => value && setMetalPriceUnit(value as PriceUnit)}
+                className="bg-muted rounded-lg p-1"
+              >
+                <ToggleGroupItem 
+                  value="oz" 
+                  className="text-xs px-3 py-1 data-[state=on]:bg-background data-[state=on]:text-foreground"
+                >
+                  per oz
+                </ToggleGroupItem>
+                <ToggleGroupItem 
+                  value="gram" 
+                  className="text-xs px-3 py-1 data-[state=on]:bg-background data-[state=on]:text-foreground"
+                >
+                  per gram
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {metalAssets.map((commodity) => (
               <CommodityCard
@@ -207,6 +233,7 @@ const Index = () => {
                 commodity={commodity}
                 isSelected={commodity.id === selectedCommodityId}
                 onClick={() => setSelectedCommodityId(commodity.id)}
+                priceUnit={metalPriceUnit}
               />
             ))}
           </div>
