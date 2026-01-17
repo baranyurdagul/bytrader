@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { useServiceWorker } from '@/hooks/useServiceWorker';
+import { usePushSubscription } from '@/hooks/usePushSubscription';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
 function PushNotificationSection({ 
   preferences, 
   isSaving, 
@@ -29,6 +31,34 @@ function PushNotificationSection({
 }) {
   const [isTesting, setIsTesting] = useState(false);
   const { permissionState, requestPermission, showNotification } = useServiceWorker();
+  const { subscribe, isSubscribing, checkSubscription } = usePushSubscription();
+
+  // Check subscription status on mount
+  useEffect(() => {
+    checkSubscription();
+  }, [checkSubscription]);
+
+  const handleTogglePush = async () => {
+    if (!preferences.push_enabled) {
+      // Enabling push - request permission and subscribe
+      if (permissionState !== 'granted') {
+        const granted = await requestPermission();
+        if (!granted) {
+          toast.error('Please allow notifications in your browser');
+          return;
+        }
+      }
+      
+      const subscribed = await subscribe();
+      if (!subscribed) {
+        toast.error('Failed to subscribe to push notifications');
+        return;
+      }
+      toast.success('Push notifications enabled!');
+    }
+    
+    togglePushEnabled();
+  };
 
   const handleTestNotification = async () => {
     setIsTesting(true);
@@ -89,8 +119,8 @@ function PushNotificationSection({
         <Switch
           id="push-enabled"
           checked={preferences.push_enabled}
-          onCheckedChange={togglePushEnabled}
-          disabled={isSaving}
+          onCheckedChange={handleTogglePush}
+          disabled={isSaving || isSubscribing}
         />
       </div>
       
