@@ -8,6 +8,7 @@ import { PriceChart } from '@/components/PriceChart';
 import { SignalHistory } from '@/components/SignalHistory';
 import { AddAlertDialog } from '@/components/AddAlertDialog';
 import { AlertsList } from '@/components/AlertsList';
+import { NewsFeed } from '@/components/NewsFeed';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { usePriceAlerts } from '@/hooks/usePriceAlerts';
 import { useWatchlist } from '@/hooks/useWatchlist';
@@ -277,7 +278,7 @@ const Index = () => {
                   value="oz" 
                   className="text-xs px-3 py-1 data-[state=on]:bg-background data-[state=on]:text-foreground"
                 >
-                  per oz
+                  per troy oz
                 </ToggleGroupItem>
                 <ToggleGroupItem 
                   value="gram" 
@@ -363,6 +364,7 @@ const Index = () => {
             <SignalCard signal={signal} commodityName={selectedCommodity.name} />
             <TrendMeter trend={trend} />
             <SignalHistory commodityName={selectedCommodity.name} />
+            <NewsFeed assetName={selectedCommodity.name} assetSymbol={selectedCommodity.symbol} />
           </div>
           
           {/* Center Column - Chart */}

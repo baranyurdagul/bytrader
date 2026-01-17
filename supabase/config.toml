@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.send-alert-email]
 verify_jwt = false
+
+[functions.fetch-asset-news]
+verify_jwt = false
