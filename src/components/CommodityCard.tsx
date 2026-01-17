@@ -1,4 +1,4 @@
-import { CommodityData, formatPrice, formatChange } from '@/lib/tradingData';
+import { CommodityData, formatPrice, formatChange, getCategoryIcon, getCategoryLabel } from '@/lib/tradingData';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -12,15 +12,41 @@ export function CommodityCard({ commodity, isSelected, onClick }: CommodityCardP
   const isPositive = commodity.change >= 0;
   const TrendIcon = commodity.change > 0 ? TrendingUp : commodity.change < 0 ? TrendingDown : Minus;
   
-  const gradientClass = 
-    commodity.id === 'gold' ? 'gradient-gold' :
-    commodity.id === 'silver' ? 'gradient-silver' :
-    'gradient-copper';
+  const getGradientClass = () => {
+    switch (commodity.id) {
+      case 'gold': return 'gradient-gold';
+      case 'silver': return 'gradient-silver';
+      case 'copper': return 'gradient-copper';
+      case 'bitcoin': return 'bg-gradient-to-br from-orange-500 to-amber-600';
+      case 'ethereum': return 'bg-gradient-to-br from-indigo-500 to-purple-600';
+      case 'nasdaq100': return 'bg-gradient-to-br from-cyan-500 to-blue-600';
+      case 'sp500': return 'bg-gradient-to-br from-emerald-500 to-green-600';
+      default: return 'bg-gradient-to-br from-gray-500 to-gray-600';
+    }
+  };
   
-  const glowClass =
-    commodity.id === 'gold' ? 'hover:shadow-[0_0_40px_-10px_hsl(43_96%_56%/0.4)]' :
-    commodity.id === 'silver' ? 'hover:shadow-[0_0_40px_-10px_hsl(220_10%_75%/0.4)]' :
-    'hover:shadow-[0_0_40px_-10px_hsl(25_80%_55%/0.4)]';
+  const getGlowClass = () => {
+    switch (commodity.id) {
+      case 'gold': return 'hover:shadow-[0_0_40px_-10px_hsl(43_96%_56%/0.4)]';
+      case 'silver': return 'hover:shadow-[0_0_40px_-10px_hsl(220_10%_75%/0.4)]';
+      case 'copper': return 'hover:shadow-[0_0_40px_-10px_hsl(25_80%_55%/0.4)]';
+      case 'bitcoin': return 'hover:shadow-[0_0_40px_-10px_hsl(30_90%_50%/0.4)]';
+      case 'ethereum': return 'hover:shadow-[0_0_40px_-10px_hsl(250_80%_60%/0.4)]';
+      case 'nasdaq100': return 'hover:shadow-[0_0_40px_-10px_hsl(195_80%_50%/0.4)]';
+      case 'sp500': return 'hover:shadow-[0_0_40px_-10px_hsl(145_70%_45%/0.4)]';
+      default: return '';
+    }
+  };
+
+  const formatDisplayPrice = () => {
+    if (commodity.price >= 1000) {
+      return formatPrice(commodity.price, 2);
+    } else if (commodity.price >= 10) {
+      return formatPrice(commodity.price, 2);
+    } else {
+      return formatPrice(commodity.price, 4);
+    }
+  };
 
   return (
     <button
@@ -28,7 +54,7 @@ export function CommodityCard({ commodity, isSelected, onClick }: CommodityCardP
       className={cn(
         "w-full p-5 rounded-xl border transition-all duration-300 text-left group",
         "bg-card hover:bg-card/80",
-        glowClass,
+        getGlowClass(),
         isSelected 
           ? "border-primary ring-1 ring-primary/30" 
           : "border-border hover:border-muted-foreground/30"
@@ -37,15 +63,19 @@ export function CommodityCard({ commodity, isSelected, onClick }: CommodityCardP
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className={cn(
-            "w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm",
-            gradientClass,
-            commodity.id === 'silver' ? 'text-background' : 'text-primary-foreground'
+            "w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm text-white",
+            getGradientClass()
           )}>
             {commodity.symbol.substring(0, 2)}
           </div>
           <div>
             <h3 className="font-semibold text-foreground">{commodity.name}</h3>
-            <p className="text-xs text-muted-foreground">{commodity.symbol}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">{commodity.symbol}</p>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                {getCategoryLabel(commodity.category)}
+              </span>
+            </div>
           </div>
         </div>
         <TrendIcon className={cn(
@@ -56,7 +86,12 @@ export function CommodityCard({ commodity, isSelected, onClick }: CommodityCardP
       
       <div className="space-y-2">
         <p className="text-2xl font-bold font-mono text-foreground">
-          ${formatPrice(commodity.price)}
+          ${formatDisplayPrice()}
+          {commodity.priceUnit && (
+            <span className="text-sm font-normal text-muted-foreground ml-1">
+              {commodity.priceUnit}
+            </span>
+          )}
         </p>
         <p className={cn(
           "text-sm font-medium font-mono",
@@ -69,11 +104,11 @@ export function CommodityCard({ commodity, isSelected, onClick }: CommodityCardP
       <div className="mt-4 pt-4 border-t border-border/50 grid grid-cols-2 gap-4">
         <div>
           <p className="text-xs text-muted-foreground">24h High</p>
-          <p className="text-sm font-mono text-foreground">${formatPrice(commodity.high24h)}</p>
+          <p className="text-sm font-mono text-foreground">${formatPrice(commodity.high24h, commodity.price < 10 ? 4 : 2)}</p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">24h Low</p>
-          <p className="text-sm font-mono text-foreground">${formatPrice(commodity.low24h)}</p>
+          <p className="text-sm font-mono text-foreground">${formatPrice(commodity.low24h, commodity.price < 10 ? 4 : 2)}</p>
         </div>
       </div>
     </button>

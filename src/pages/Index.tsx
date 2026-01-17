@@ -29,8 +29,8 @@ const Index = () => {
   );
   
   const signal = useMemo(() => 
-    getSignal(indicators, selectedCommodity.price),
-    [indicators, selectedCommodity.price]
+    getSignal(indicators, selectedCommodity.price, selectedCommodity.name),
+    [indicators, selectedCommodity.price, selectedCommodity.name]
   );
   
   const trend = useMemo(() => 
@@ -38,16 +38,57 @@ const Index = () => {
     [selectedCommodity]
   );
 
+  // Group commodities by category
+  const metalAssets = commodities.filter(c => c.category === 'metal');
+  const cryptoAssets = commodities.filter(c => c.category === 'crypto');
+  const indexAssets = commodities.filter(c => c.category === 'index');
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       
       <main className="container mx-auto px-4 py-6">
-        {/* Commodity Selection */}
-        <section className="mb-8">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Commodities</h2>
+        {/* Metals Section */}
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            🏆 Precious Metals <span className="text-xs text-muted-foreground font-normal">(price per troy ounce)</span>
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {commodities.map((commodity) => (
+            {metalAssets.map((commodity) => (
+              <CommodityCard
+                key={commodity.id}
+                commodity={commodity}
+                isSelected={commodity.id === selectedCommodityId}
+                onClick={() => setSelectedCommodityId(commodity.id)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Crypto Section */}
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            ₿ Cryptocurrencies
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {cryptoAssets.map((commodity) => (
+              <CommodityCard
+                key={commodity.id}
+                commodity={commodity}
+                isSelected={commodity.id === selectedCommodityId}
+                onClick={() => setSelectedCommodityId(commodity.id)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Indices Section */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            📊 Stock Indices
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {indexAssets.map((commodity) => (
               <CommodityCard
                 key={commodity.id}
                 commodity={commodity}
