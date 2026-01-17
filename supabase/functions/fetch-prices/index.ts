@@ -299,11 +299,11 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
   }
 }
 
-// Realistic fallback prices based on actual market data (January 2026)
+// Realistic fallback prices based on actual market data (January 2025)
 function getMetalFallbackData(): PriceData[] {
-  const goldBase = 4500 + (Math.random() - 0.5) * 50;
-  const silverBase = 90 + (Math.random() - 0.5) * 3;
-  const copperBase = 5.50 + (Math.random() - 0.5) * 0.15;
+  const goldBase = 2650 + (Math.random() - 0.5) * 30;
+  const silverBase = 31.5 + (Math.random() - 0.5) * 1;
+  const copperBase = 4.25 + (Math.random() - 0.5) * 0.10;
   
   return [
     {
@@ -313,12 +313,12 @@ function getMetalFallbackData(): PriceData[] {
       category: 'metal',
       price: goldBase,
       priceUnit: '/oz',
-      change: (Math.random() - 0.5) * 40,
+      change: (Math.random() - 0.5) * 25,
       changePercent: (Math.random() - 0.5) * 1,
       high24h: goldBase * 1.005,
       low24h: goldBase * 0.995,
       volume: '125.4K',
-      marketCap: '$15.8T',
+      marketCap: '$12.5T',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
     },
@@ -329,12 +329,12 @@ function getMetalFallbackData(): PriceData[] {
       category: 'metal',
       price: silverBase,
       priceUnit: '/oz',
-      change: (Math.random() - 0.5) * 2,
+      change: (Math.random() - 0.5) * 0.8,
       changePercent: (Math.random() - 0.5) * 2,
       high24h: silverBase * 1.008,
       low24h: silverBase * 0.992,
       volume: '89.2K',
-      marketCap: '$4.2T',
+      marketCap: '$1.4T',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
     },
@@ -345,12 +345,12 @@ function getMetalFallbackData(): PriceData[] {
       category: 'metal',
       price: copperBase,
       priceUnit: '/lb',
-      change: (Math.random() - 0.5) * 0.08,
+      change: (Math.random() - 0.5) * 0.06,
       changePercent: (Math.random() - 0.5) * 2,
       high24h: copperBase * 1.01,
       low24h: copperBase * 0.99,
       volume: '234.8K',
-      marketCap: '$320B',
+      marketCap: '$245B',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
     },
