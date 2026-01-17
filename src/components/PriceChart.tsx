@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { PricePoint, TechnicalIndicators as TechnicalIndicatorsType } from '@/lib/tradingData';
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface PriceChartProps {
   priceHistory: PricePoint[];
@@ -8,20 +10,51 @@ interface PriceChartProps {
   commodityId: string;
 }
 
-export function PriceChart({ priceHistory, indicators, commodityId }: PriceChartProps) {
-  const chartData = priceHistory.map((point, index) => ({
-    date: new Date(point.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    price: point.close,
-    high: point.high,
-    low: point.low,
-    sma20: index >= 19 ? indicators.movingAverages.sma20 : null,
-    upperBB: indicators.bollingerBands.upper,
-    lowerBB: indicators.bollingerBands.lower,
-  }));
+type TimeRange = '1W' | '1M' | '3M' | '1Y';
 
-  const currentPrice = priceHistory[priceHistory.length - 1].close;
-  const startPrice = priceHistory[0].close;
+const TIME_RANGES: { label: string; value: TimeRange; days: number }[] = [
+  { label: '1W', value: '1W', days: 7 },
+  { label: '1M', value: '1M', days: 30 },
+  { label: '3M', value: '3M', days: 90 },
+  { label: '1Y', value: '1Y', days: 365 },
+];
+
+export function PriceChart({ priceHistory, indicators, commodityId }: PriceChartProps) {
+  const [selectedRange, setSelectedRange] = useState<TimeRange>('1M');
+
+  const selectedDays = TIME_RANGES.find(r => r.value === selectedRange)?.days || 30;
+  
+  // Filter price history based on selected range
+  const filteredHistory = priceHistory.slice(-selectedDays);
+
+  const chartData = filteredHistory.map((point, index) => {
+    // Format date based on time range
+    const date = new Date(point.timestamp);
+    let formattedDate: string;
+    
+    if (selectedRange === '1W') {
+      formattedDate = date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+    } else if (selectedRange === '1Y') {
+      formattedDate = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    } else {
+      formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    return {
+      date: formattedDate,
+      price: point.close,
+      high: point.high,
+      low: point.low,
+      sma20: index >= 19 ? indicators.movingAverages.sma20 : null,
+      upperBB: indicators.bollingerBands.upper,
+      lowerBB: indicators.bollingerBands.lower,
+    };
+  });
+
+  const currentPrice = filteredHistory[filteredHistory.length - 1]?.close || 0;
+  const startPrice = filteredHistory[0]?.close || 0;
   const isPositive = currentPrice >= startPrice;
+  const changePercent = startPrice > 0 ? ((currentPrice - startPrice) / startPrice * 100) : 0;
 
   const gradientId = `gradient-${commodityId}`;
   const strokeColor = 
@@ -32,16 +65,39 @@ export function PriceChart({ priceHistory, indicators, commodityId }: PriceChart
   return (
     <div className="glass-card rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground">Price Chart (30 Days)</h3>
-        <div className="flex items-center gap-4 text-xs">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-0.5 rounded bg-success" />
-            <span className="text-muted-foreground">Support</span>
+        <h3 className="font-semibold text-foreground">Price Chart</h3>
+        <div className="flex items-center gap-2">
+          {/* Time Range Selector */}
+          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+            {TIME_RANGES.map((range) => (
+              <Button
+                key={range.value}
+                variant={selectedRange === range.value ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-7 px-3 text-xs font-medium transition-all",
+                  selectedRange === range.value 
+                    ? "bg-primary text-primary-foreground shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setSelectedRange(range.value)}
+              >
+                {range.label}
+              </Button>
+            ))}
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-0.5 rounded bg-destructive" />
-            <span className="text-muted-foreground">Resistance</span>
-          </div>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 text-xs mb-4">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-0.5 rounded bg-success" />
+          <span className="text-muted-foreground">Support</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-0.5 rounded bg-destructive" />
+          <span className="text-muted-foreground">Resistance</span>
         </div>
       </div>
       
@@ -113,7 +169,7 @@ export function PriceChart({ priceHistory, indicators, commodityId }: PriceChart
         </ResponsiveContainer>
       </div>
       
-      {/* Chart Legend */}
+      {/* Chart Footer */}
       <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between text-xs">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
@@ -132,7 +188,7 @@ export function PriceChart({ priceHistory, indicators, commodityId }: PriceChart
           "font-mono font-semibold",
           isPositive ? "text-success" : "text-destructive"
         )}>
-          {isPositive ? '+' : ''}{((currentPrice - startPrice) / startPrice * 100).toFixed(2)}% (30d)
+          {isPositive ? '+' : ''}{changePercent.toFixed(2)}% ({TIME_RANGES.find(r => r.value === selectedRange)?.label})
         </div>
       </div>
     </div>

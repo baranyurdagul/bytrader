@@ -14,6 +14,7 @@ interface NewsItem {
   title: string;
   summary: string;
   sentiment: 'positive' | 'negative' | 'neutral';
+  timestamp: string;
 }
 
 serve(async (req: Request) => {
@@ -48,16 +49,17 @@ serve(async (req: Request) => {
 1. A concise headline (max 100 chars)
 2. A brief summary (1-2 sentences)
 3. Sentiment: positive, negative, or neutral
+4. Timestamp: a realistic time from the past 24 hours in relative format (e.g., "2h ago", "45m ago", "Just now", "5h ago")
 
-Format your response as a JSON array with objects containing: title, summary, sentiment
+Format your response as a JSON array with objects containing: title, summary, sentiment, timestamp
 
 Example format:
 [
-  {"title": "Gold Prices Rise...", "summary": "Gold prices increased...", "sentiment": "positive"},
+  {"title": "Gold Prices Rise...", "summary": "Gold prices increased...", "sentiment": "positive", "timestamp": "2h ago"},
   ...
 ]
 
-Make the headlines diverse covering different aspects like price movements, market analysis, institutional activity, and economic factors. Be realistic and current-sounding.`;
+Make the headlines diverse covering different aspects like price movements, market analysis, institutional activity, and economic factors. Be realistic and current-sounding. Vary the timestamps to make them look natural.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
