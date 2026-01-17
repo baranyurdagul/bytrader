@@ -1,18 +1,125 @@
+import { useState } from 'react';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
+import { useServiceWorker } from '@/hooks/useServiceWorker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { 
   Mail, 
   Bell, 
   Moon,
   Clock,
-  Loader2
+  Loader2,
+  Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+function PushNotificationSection({ 
+  preferences, 
+  isSaving, 
+  togglePushEnabled 
+}: { 
+  preferences: any; 
+  isSaving: boolean; 
+  togglePushEnabled: () => void;
+}) {
+  const [isTesting, setIsTesting] = useState(false);
+  const { permissionState, requestPermission, showNotification } = useServiceWorker();
+
+  const handleTestNotification = async () => {
+    setIsTesting(true);
+    
+    try {
+      // First ensure we have permission
+      if (permissionState !== 'granted') {
+        const granted = await requestPermission();
+        if (!granted) {
+          toast.error('Please allow notifications to test');
+          setIsTesting(false);
+          return;
+        }
+      }
+      
+      // Send test notification
+      const success = await showNotification(
+        '🎉 Test Notification',
+        'Push notifications are working! You\'ll receive alerts when prices hit your targets.',
+        { tag: 'test-notification' }
+      );
+      
+      if (success) {
+        toast.success('Test notification sent!');
+      } else {
+        toast.error('Failed to send notification');
+      }
+    } catch (error) {
+      console.error('Test notification error:', error);
+      toast.error('Failed to send test notification');
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "p-2 rounded-lg",
+            preferences.push_enabled ? "bg-primary/10" : "bg-muted"
+          )}>
+            <Bell className={cn(
+              "w-4 h-4",
+              preferences.push_enabled ? "text-primary" : "text-muted-foreground"
+            )} />
+          </div>
+          <div>
+            <Label htmlFor="push-enabled" className="text-sm font-medium">
+              Push Notifications
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Browser notifications even when the tab is in background
+            </p>
+          </div>
+        </div>
+        <Switch
+          id="push-enabled"
+          checked={preferences.push_enabled}
+          onCheckedChange={togglePushEnabled}
+          disabled={isSaving}
+        />
+      </div>
+      
+      {preferences.push_enabled && (
+        <div className="ml-11">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestNotification}
+            disabled={isTesting}
+            className="gap-2"
+          >
+            {isTesting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            Test Notification
+          </Button>
+          {permissionState === 'denied' && (
+            <p className="text-xs text-destructive mt-2">
+              Notifications are blocked. Please enable them in your browser settings.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function NotificationSettings() {
   const { 
@@ -124,33 +231,11 @@ export function NotificationSettings() {
         <Separator />
 
         {/* Push Notifications */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "p-2 rounded-lg",
-              preferences.push_enabled ? "bg-primary/10" : "bg-muted"
-            )}>
-              <Bell className={cn(
-                "w-4 h-4",
-                preferences.push_enabled ? "text-primary" : "text-muted-foreground"
-              )} />
-            </div>
-            <div>
-              <Label htmlFor="push-enabled" className="text-sm font-medium">
-                Push Notifications
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Browser notifications even when the tab is in background
-              </p>
-            </div>
-          </div>
-          <Switch
-            id="push-enabled"
-            checked={preferences.push_enabled}
-            onCheckedChange={togglePushEnabled}
-            disabled={isSaving}
-          />
-        </div>
+        <PushNotificationSection 
+          preferences={preferences} 
+          isSaving={isSaving} 
+          togglePushEnabled={togglePushEnabled} 
+        />
 
         <Separator />
 
