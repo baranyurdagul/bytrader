@@ -8,6 +8,7 @@ interface NewsItem {
   title: string;
   summary: string;
   sentiment: 'positive' | 'negative' | 'neutral';
+  timestamp?: string;
 }
 
 interface NewsFeedProps {
@@ -119,9 +120,16 @@ export function NewsFeed({ assetName, assetSymbol }: NewsFeedProps) {
                   {getSentimentIcon(item.sentiment)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm text-foreground leading-tight mb-1">
-                    {item.title}
-                  </h4>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <h4 className="font-medium text-sm text-foreground leading-tight flex-1">
+                      {item.title}
+                    </h4>
+                    {item.timestamp && (
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        {item.timestamp}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">
                     {item.summary}
                   </p>

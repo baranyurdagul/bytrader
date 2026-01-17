@@ -19,10 +19,10 @@ interface LivePriceData {
   lastUpdated: string;
 }
 
-// Generate price history from current price
-function generatePriceHistory(basePrice: number, volatility: number, days: number = 30): PricePoint[] {
+// Generate price history from current price - extended to 365 days for yearly view
+function generatePriceHistory(basePrice: number, volatility: number, days: number = 365): PricePoint[] {
   const history: PricePoint[] = [];
-  let currentPrice = basePrice * (0.95 + Math.random() * 0.1);
+  let currentPrice = basePrice * (0.85 + Math.random() * 0.15);
   const now = Date.now();
   
   for (let i = days; i >= 0; i--) {
