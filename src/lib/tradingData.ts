@@ -15,6 +15,9 @@ export interface CommodityData {
   marketCap: string;
   priceHistory: PricePoint[];
   dataSource?: 'live' | 'simulated';
+  // ETF-specific fields
+  dividendYield?: number;
+  expenseRatio?: number;
 }
 
 export interface PricePoint {
@@ -564,7 +567,9 @@ export function getCommodityData(): CommodityData[] {
       low24h: vym.low,
       volume: '2.1M',
       marketCap: '$56B',
-      priceHistory: vymHistory
+      priceHistory: vymHistory,
+      dividendYield: 2.85,
+      expenseRatio: 0.06
     },
     {
       id: 'vymi',
@@ -579,7 +584,9 @@ export function getCommodityData(): CommodityData[] {
       low24h: vymi.low,
       volume: '450K',
       marketCap: '$8.5B',
-      priceHistory: vymiHistory
+      priceHistory: vymiHistory,
+      dividendYield: 4.52,
+      expenseRatio: 0.22
     },
     {
       id: 'gldm',
@@ -594,7 +601,9 @@ export function getCommodityData(): CommodityData[] {
       low24h: gldm.low,
       volume: '3.5M',
       marketCap: '$9.2B',
-      priceHistory: gldmHistory
+      priceHistory: gldmHistory,
+      dividendYield: 0,
+      expenseRatio: 0.10
     },
     {
       id: 'slv',
@@ -609,7 +618,9 @@ export function getCommodityData(): CommodityData[] {
       low24h: slv.low,
       volume: '12.5M',
       marketCap: '$11.5B',
-      priceHistory: slvHistory
+      priceHistory: slvHistory,
+      dividendYield: 0,
+      expenseRatio: 0.50
     }
   ];
 }

@@ -18,6 +18,9 @@ interface PriceData {
   marketCap: string;
   lastUpdated: string;
   dataSource: 'live' | 'simulated';
+  // ETF-specific fields
+  dividendYield?: number;
+  expenseRatio?: number;
 }
 
 // Yahoo Finance tickers for commodities, indices, and ETFs
@@ -155,10 +158,10 @@ async function fetchETFPrices(): Promise<PriceData[]> {
   const results: PriceData[] = [];
   
   const etfConfigs = [
-    { quote: vymQuote, id: 'vym', name: 'Vanguard High Dividend Yield', symbol: 'VYM', marketCap: '$56B' },
-    { quote: vymiQuote, id: 'vymi', name: 'Vanguard Intl High Dividend', symbol: 'VYMI', marketCap: '$8.5B' },
-    { quote: gldmQuote, id: 'gldm', name: 'SPDR Gold MiniShares', symbol: 'GLDM', marketCap: '$9.2B' },
-    { quote: slvQuote, id: 'slv', name: 'iShares Silver Trust', symbol: 'SLV', marketCap: '$11.5B' },
+    { quote: vymQuote, id: 'vym', name: 'Vanguard High Dividend Yield', symbol: 'VYM', marketCap: '$56B', dividendYield: 2.85, expenseRatio: 0.06 },
+    { quote: vymiQuote, id: 'vymi', name: 'Vanguard Intl High Dividend', symbol: 'VYMI', marketCap: '$8.5B', dividendYield: 4.52, expenseRatio: 0.22 },
+    { quote: gldmQuote, id: 'gldm', name: 'SPDR Gold MiniShares', symbol: 'GLDM', marketCap: '$9.2B', dividendYield: 0, expenseRatio: 0.10 },
+    { quote: slvQuote, id: 'slv', name: 'iShares Silver Trust', symbol: 'SLV', marketCap: '$11.5B', dividendYield: 0, expenseRatio: 0.50 },
   ];
   
   for (const config of etfConfigs) {
@@ -179,6 +182,8 @@ async function fetchETFPrices(): Promise<PriceData[]> {
         marketCap: config.marketCap,
         lastUpdated: new Date().toISOString(),
         dataSource: 'live',
+        dividendYield: config.dividendYield,
+        expenseRatio: config.expenseRatio,
       });
     }
   }
@@ -366,6 +371,8 @@ function getETFFallbackData(): PriceData[] {
       marketCap: '$56B',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
+      dividendYield: 2.85,
+      expenseRatio: 0.06,
     },
     {
       id: 'vymi',
@@ -382,6 +389,8 @@ function getETFFallbackData(): PriceData[] {
       marketCap: '$8.5B',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
+      dividendYield: 4.52,
+      expenseRatio: 0.22,
     },
     {
       id: 'gldm',
@@ -398,6 +407,8 @@ function getETFFallbackData(): PriceData[] {
       marketCap: '$9.2B',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
+      dividendYield: 0,
+      expenseRatio: 0.10,
     },
     {
       id: 'slv',
@@ -414,6 +425,8 @@ function getETFFallbackData(): PriceData[] {
       marketCap: '$11.5B',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
+      dividendYield: 0,
+      expenseRatio: 0.50,
     },
   ];
 }
