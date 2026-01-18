@@ -1,58 +1,189 @@
-import { Signal } from '@/lib/tradingData';
+import { Signal, PricePoint } from '@/lib/tradingData';
 import { cn } from '@/lib/utils';
-import { ArrowUpCircle, ArrowDownCircle, MinusCircle, Clock } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, MinusCircle, Clock, Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SignalHistoryProps {
   commodityName: string;
+  priceHistory?: PricePoint[];
 }
 
-// Generate mock historical signals
-function generateHistoricalSignals(commodityName: string): Array<Signal & { commodity: string }> {
-  const types: Signal['type'][] = ['BUY', 'SELL', 'HOLD'];
-  const strengths: Signal['strength'][] = ['STRONG', 'MODERATE', 'WEAK'];
-  const indicators = [
-    'RSI Oversold',
-    'MACD Bullish Crossover',
-    'Price Above MA20',
-    'Golden Cross',
-    'RSI Overbought',
-    'MACD Bearish Crossover',
-    'Price Below MA50',
-    'Death Cross',
-    'Stochastic Oversold',
-    'Bollinger Band Touch'
-  ];
+// Calculate RSI from prices
+function calculateRSI(prices: number[], period: number = 14): number {
+  if (prices.length < period + 1) return 50;
   
+  let gains = 0;
+  let losses = 0;
+  
+  for (let i = 1; i <= period; i++) {
+    const change = prices[prices.length - i] - prices[prices.length - i - 1];
+    if (change > 0) gains += change;
+    else losses -= change;
+  }
+  
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+// Calculate SMA
+function calculateSMA(prices: number[], period: number): number {
+  if (prices.length < period) return prices[prices.length - 1] || 0;
+  const slice = prices.slice(-period);
+  return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+// Calculate EMA
+function calculateEMA(prices: number[], period: number): number {
+  if (prices.length < period) return prices[prices.length - 1] || 0;
+  const multiplier = 2 / (period + 1);
+  let ema = calculateSMA(prices.slice(0, period), period);
+  
+  for (let i = period; i < prices.length; i++) {
+    ema = (prices[i] - ema) * multiplier + ema;
+  }
+  
+  return ema;
+}
+
+// Generate signals based on actual price history at different time points
+function generateHistoricalSignalsFromData(
+  commodityName: string, 
+  priceHistory: PricePoint[]
+): Array<Signal & { commodity: string }> {
   const signals: Array<Signal & { commodity: string }> = [];
   
+  if (!priceHistory || priceHistory.length < 20) {
+    // Return a placeholder message if not enough data
+    return [{
+      type: 'HOLD',
+      strength: 'WEAK',
+      indicators: ['Insufficient historical data'],
+      confidence: 50,
+      timestamp: new Date(),
+      actionMessage: `Not enough historical data to generate signals for ${commodityName}.`,
+      urgency: 'LOW',
+      commodity: commodityName
+    }];
+  }
+  
+  // Generate signals at different historical points (every ~4 hours worth of data)
+  const dataPointsPerSignal = Math.max(1, Math.floor(priceHistory.length / 5));
+  
   for (let i = 0; i < 5; i++) {
-    const type = types[Math.floor(Math.random() * types.length)];
-    const numIndicators = Math.floor(Math.random() * 3) + 2;
-    const selectedIndicators = [];
+    const endIdx = priceHistory.length - (i * dataPointsPerSignal);
+    if (endIdx < 20) break;
     
-    for (let j = 0; j < numIndicators; j++) {
-      const ind = indicators[Math.floor(Math.random() * indicators.length)];
-      if (!selectedIndicators.includes(ind)) {
-        selectedIndicators.push(ind);
-      }
+    const historicalSlice = priceHistory.slice(0, endIdx);
+    const closes = historicalSlice.map(p => p.close);
+    const currentPrice = closes[closes.length - 1];
+    
+    // Calculate indicators at this point in time
+    const rsi = calculateRSI(closes, 14);
+    const sma20 = calculateSMA(closes, 20);
+    const sma50 = calculateSMA(closes, Math.min(50, closes.length));
+    const ema12 = calculateEMA(closes, 12);
+    const ema26 = calculateEMA(closes, 26);
+    const macdValue = ema12 - ema26;
+    
+    // Determine signal based on indicators
+    const indicatorsList: string[] = [];
+    let buyScore = 0;
+    let sellScore = 0;
+    
+    // RSI Analysis
+    if (rsi < 30) {
+      indicatorsList.push('RSI Oversold');
+      buyScore += 2;
+    } else if (rsi > 70) {
+      indicatorsList.push('RSI Overbought');
+      sellScore += 2;
     }
     
-    const strength = strengths[Math.floor(Math.random() * strengths.length)];
-    const urgency = strength === 'STRONG' ? 'HIGH' : strength === 'MODERATE' ? 'MEDIUM' : 'LOW';
-    const actionMessage = type === 'BUY' 
-      ? `Good opportunity to consider buying ${commodityName}.`
-      : type === 'SELL' 
-        ? `Consider taking profits on ${commodityName}.`
-        : `Hold position on ${commodityName}.`;
+    // MACD Analysis
+    if (macdValue > 0) {
+      indicatorsList.push('MACD Bullish');
+      buyScore += 1.5;
+    } else if (macdValue < 0) {
+      indicatorsList.push('MACD Bearish');
+      sellScore += 1.5;
+    }
+    
+    // Price vs SMA
+    if (currentPrice > sma20) {
+      indicatorsList.push('Price Above SMA20');
+      buyScore += 1;
+    } else {
+      indicatorsList.push('Price Below SMA20');
+      sellScore += 1;
+    }
+    
+    // Golden/Death Cross
+    if (sma20 > sma50) {
+      indicatorsList.push('Golden Cross');
+      buyScore += 1;
+    } else if (sma20 < sma50) {
+      indicatorsList.push('Death Cross');
+      sellScore += 1;
+    }
+    
+    // Determine signal type
+    let type: Signal['type'];
+    let strength: Signal['strength'];
+    let urgency: Signal['urgency'];
+    
+    const scoreDiff = buyScore - sellScore;
+    const totalScore = buyScore + sellScore;
+    const confidence = totalScore > 0 
+      ? Math.min(95, (Math.abs(scoreDiff) / totalScore) * 100 + 50) 
+      : 50;
+    
+    if (scoreDiff > 1.5) {
+      type = 'BUY';
+      strength = buyScore > 4 ? 'STRONG' : buyScore > 2.5 ? 'MODERATE' : 'WEAK';
+      urgency = buyScore > 4 ? 'HIGH' : buyScore > 2.5 ? 'MEDIUM' : 'LOW';
+    } else if (scoreDiff < -1.5) {
+      type = 'SELL';
+      strength = sellScore > 4 ? 'STRONG' : sellScore > 2.5 ? 'MODERATE' : 'WEAK';
+      urgency = sellScore > 4 ? 'HIGH' : sellScore > 2.5 ? 'MEDIUM' : 'LOW';
+    } else {
+      type = 'HOLD';
+      strength = 'MODERATE';
+      urgency = 'LOW';
+    }
+    
+    // Create action message
+    let actionMessage: string;
+    if (type === 'BUY') {
+      actionMessage = strength === 'STRONG' 
+        ? `Strong buying opportunity for ${commodityName}.`
+        : `Consider buying ${commodityName}.`;
+    } else if (type === 'SELL') {
+      actionMessage = strength === 'STRONG'
+        ? `Strong sell signal for ${commodityName}.`
+        : `Consider selling ${commodityName}.`;
+    } else {
+      actionMessage = `Hold position on ${commodityName}.`;
+    }
+    
+    // Use the timestamp from the historical data point
+    const timestamp = new Date(historicalSlice[historicalSlice.length - 1].timestamp);
     
     signals.push({
       type,
       strength,
-      indicators: selectedIndicators,
-      confidence: Math.floor(Math.random() * 40) + 55,
-      timestamp: new Date(Date.now() - (i + 1) * 4 * 60 * 60 * 1000),
+      indicators: indicatorsList.slice(0, 3),
+      confidence: Math.round(confidence),
+      timestamp,
       actionMessage,
-      urgency: urgency as Signal['urgency'],
+      urgency,
       commodity: commodityName
     });
   }
@@ -60,14 +191,28 @@ function generateHistoricalSignals(commodityName: string): Array<Signal & { comm
   return signals;
 }
 
-export function SignalHistory({ commodityName }: SignalHistoryProps) {
-  const historicalSignals = generateHistoricalSignals(commodityName);
+export function SignalHistory({ commodityName, priceHistory }: SignalHistoryProps) {
+  const historicalSignals = generateHistoricalSignalsFromData(commodityName, priceHistory || []);
   
   return (
     <div className="glass-card rounded-xl p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <Clock className="w-4 h-4 text-primary" />
-        <h3 className="font-semibold text-foreground">Recent Signals</h3>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-primary" />
+          <h3 className="font-semibold text-foreground">Recent Signals</h3>
+        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button className="text-muted-foreground hover:text-primary transition-colors">
+              <Info className="w-4 h-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="max-w-[250px]">
+            <p className="text-xs">
+              Signals are calculated from real historical price data using RSI, MACD, and moving average analysis.
+            </p>
+          </TooltipContent>
+        </Tooltip>
       </div>
       
       <div className="space-y-3">
