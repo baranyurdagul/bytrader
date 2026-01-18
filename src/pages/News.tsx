@@ -23,6 +23,7 @@ interface NewsItem {
   sentiment: 'positive' | 'negative' | 'neutral';
   timestamp?: string;
   asset?: string;
+  source?: string;
 }
 
 const commodities = [
@@ -62,7 +63,8 @@ export default function News() {
           if (!fnError && data?.news) {
             const newsWithAsset = data.news.map((item: NewsItem) => ({
               ...item,
-              asset: commodity.name
+              asset: commodity.name,
+              source: 'Investing.com'
             }));
             allNews.push(...newsWithAsset);
           }
@@ -86,7 +88,8 @@ export default function News() {
         if (data?.news) {
           const newsWithAsset = data.news.map((item: NewsItem) => ({
             ...item,
-            asset: commodity.name
+            asset: commodity.name,
+            source: 'Investing.com'
           }));
           setNews(newsWithAsset);
         }
@@ -237,10 +240,15 @@ export default function News() {
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 mb-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 {item.asset && (
                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
                                     {item.asset}
+                                  </span>
+                                )}
+                                {item.source && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-accent-foreground font-medium">
+                                    {item.source}
                                   </span>
                                 )}
                                 {item.timestamp && (
