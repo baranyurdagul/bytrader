@@ -205,7 +205,7 @@ const AssetDetail = () => {
           <div className="lg:col-span-4 space-y-6">
             <SignalCard signal={signal} commodityName={selectedCommodity.name} />
             <TrendMeter trend={trend} />
-            <SignalHistory commodityName={selectedCommodity.name} />
+            <SignalHistory commodityName={selectedCommodity.name} priceHistory={selectedCommodity.priceHistory} />
           </div>
           
           {/* Center Column - Chart */}

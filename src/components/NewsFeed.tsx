@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Newspaper, TrendingUp, TrendingDown, Minus, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Newspaper, TrendingUp, TrendingDown, Minus, RefreshCw, AlertCircle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -14,7 +14,8 @@ interface NewsItem {
   summary: string;
   sentiment: 'positive' | 'negative' | 'neutral';
   timestamp?: string;
-  details?: string;
+  url?: string;
+  source?: string;
 }
 
 interface NewsFeedProps {
@@ -176,6 +177,11 @@ export function NewsFeed({ assetName, assetSymbol }: NewsFeedProps) {
                           )}>
                             {item.summary}
                           </p>
+                          {item.source && (
+                            <p className="text-[10px] text-primary/70 mt-1">
+                              Source: {item.source}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </button>
@@ -214,6 +220,20 @@ export function NewsFeed({ assetName, assetSymbol }: NewsFeedProps) {
                             }
                           </p>
                         </div>
+                        
+                        {/* Read Full Article Link */}
+                        {item.url && (
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            Read Full Article
+                          </a>
+                        )}
                       </div>
                     </div>
                   </CollapsibleContent>
