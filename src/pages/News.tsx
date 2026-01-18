@@ -44,6 +44,28 @@ export default function News() {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [selectedCommodity, setSelectedCommodity] = useState('all');
 
+  // Parse relative timestamp to minutes for sorting
+  const parseTimestamp = (timestamp?: string): number => {
+    if (!timestamp) return 999999;
+    const lower = timestamp.toLowerCase();
+    if (lower === 'just now') return 0;
+    
+    const match = lower.match(/(\d+)\s*(m|h|d)/);
+    if (match) {
+      const value = parseInt(match[1]);
+      const unit = match[2];
+      if (unit === 'm') return value;
+      if (unit === 'h') return value * 60;
+      if (unit === 'd') return value * 60 * 24;
+    }
+    return 999999;
+  };
+
+  // Sort news by timestamp (most recent first)
+  const sortNewsByTime = (newsItems: NewsItem[]): NewsItem[] => {
+    return [...newsItems].sort((a, b) => parseTimestamp(a.timestamp) - parseTimestamp(b.timestamp));
+  };
+
   const fetchNews = async (commodityId: string) => {
     setIsLoading(true);
     setError(null);
@@ -70,9 +92,9 @@ export default function News() {
           }
         }
 
-        // Shuffle and limit to show variety
-        const shuffled = allNews.sort(() => Math.random() - 0.5).slice(0, 10);
-        setNews(shuffled);
+        // Sort by timestamp and limit
+        const sorted = sortNewsByTime(allNews).slice(0, 15);
+        setNews(sorted);
       } else {
         const commodity = commodities.find(c => c.id === commodityId);
         if (!commodity) return;
@@ -91,7 +113,7 @@ export default function News() {
             asset: commodity.name,
             source: 'Investing.com'
           }));
-          setNews(newsWithAsset);
+          setNews(sortNewsByTime(newsWithAsset));
         }
       }
     } catch (err) {
