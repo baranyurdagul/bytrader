@@ -15,6 +15,7 @@ interface NewsItem {
   summary: string;
   sentiment: 'positive' | 'negative' | 'neutral';
   timestamp: string;
+  url: string;
 }
 
 serve(async (req: Request) => {
@@ -45,21 +46,22 @@ serve(async (req: Request) => {
 
     console.log(`Fetching news for ${assetName} (${assetSymbol})`);
 
-    const prompt = `Generate 5 realistic financial news headlines about ${assetName} (${assetSymbol}) that could appear in financial news today. For each headline, provide:
+    const prompt = `Generate 5 realistic financial news headlines about ${assetName} (${assetSymbol}) that could appear on Investing.com today. For each headline, provide:
 1. A concise headline (max 100 chars)
 2. A brief summary (1-2 sentences)
 3. Sentiment: positive, negative, or neutral
 4. Timestamp: a realistic time from the past 24 hours in relative format (e.g., "2h ago", "45m ago", "Just now", "5h ago")
+5. URL: a realistic Investing.com article URL using the format https://www.investing.com/news/[category]-news/[slug-based-on-title]-[random-6-digit-number]
 
-Format your response as a JSON array with objects containing: title, summary, sentiment, timestamp
+Format your response as a JSON array with objects containing: title, summary, sentiment, timestamp, url
 
 Example format:
 [
-  {"title": "Gold Prices Rise...", "summary": "Gold prices increased...", "sentiment": "positive", "timestamp": "2h ago"},
+  {"title": "Gold Prices Rise...", "summary": "Gold prices increased...", "sentiment": "positive", "timestamp": "2h ago", "url": "https://www.investing.com/news/commodities-news/gold-prices-rise-on-safe-haven-demand-123456"},
   ...
 ]
 
-Make the headlines diverse covering different aspects like price movements, market analysis, institutional activity, and economic factors. Be realistic and current-sounding. Vary the timestamps to make them look natural.`;
+Make the headlines diverse covering different aspects like price movements, market analysis, institutional activity, and economic factors. Be realistic and current-sounding. Vary the timestamps to make them look natural. Generate realistic but fictional URLs.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
