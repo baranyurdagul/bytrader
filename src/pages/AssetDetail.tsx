@@ -150,6 +150,25 @@ const AssetDetail = () => {
                   <span className="text-sm font-normal text-muted-foreground">
                     {selectedCommodity.symbol}
                   </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn(
+                        "text-xs px-2 py-0.5 rounded-full flex items-center gap-1 font-normal cursor-help",
+                        selectedCommodity.dataSource === 'live' 
+                          ? "bg-success/20 text-success" 
+                          : "bg-muted text-muted-foreground"
+                      )}>
+                        {selectedCommodity.dataSource === 'live' ? '● Live' : '○ Simulated'}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs max-w-[200px]">
+                        {selectedCommodity.dataSource === 'live' 
+                          ? "Real-time data from Yahoo Finance / CoinGecko" 
+                          : "Simulated data (API temporarily unavailable)"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
                 </h1>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-3xl font-mono font-bold text-foreground">
