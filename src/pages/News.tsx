@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
-import { Newspaper, TrendingUp, TrendingDown, Minus, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { Newspaper, TrendingUp, TrendingDown, Minus, RefreshCw, AlertCircle, ChevronDown, ChevronUp, Filter, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -24,6 +24,7 @@ interface NewsItem {
   timestamp?: string;
   asset?: string;
   source?: string;
+  url?: string;
 }
 
 const commodities = [
@@ -323,6 +324,20 @@ export default function News() {
                                 }
                               </p>
                             </div>
+
+                            {/* Read Full Article Link */}
+                            {item.url && (
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                Read full article on Investing.com
+                              </a>
+                            )}
                           </div>
                         </div>
                       </CollapsibleContent>
