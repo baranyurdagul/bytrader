@@ -81,6 +81,11 @@ const AssetDetail = () => {
     [selectedCommodity]
   );
 
+  // Auto-refresh when navigating to this page or when assetId changes
+  useEffect(() => {
+    refetch();
+  }, [assetId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Check alerts when prices update
   useEffect(() => {
     if (commodities.length > 0) {
