@@ -4,7 +4,7 @@ export interface CommodityData {
   id: string;
   name: string;
   symbol: string;
-  category: 'metal' | 'crypto' | 'index';
+  category: 'metal' | 'crypto' | 'index' | 'etf';
   price: number;
   priceUnit: string;
   change: number;
@@ -423,7 +423,6 @@ export function getCommodityData(): CommodityData[] {
   // Metals (prices per troy ounce) - Jan 2026
   const goldHistory = generatePriceHistory(4500, 0.015);
   const silverHistory = generatePriceHistory(90, 0.025);
-  const copperHistory = generatePriceHistory(5.50, 0.02);
   
   // Crypto
   const bitcoinHistory = generatePriceHistory(95000, 0.04);
@@ -432,6 +431,12 @@ export function getCommodityData(): CommodityData[] {
   // Indices
   const nasdaqHistory = generatePriceHistory(21500, 0.018);
   const sp500History = generatePriceHistory(5900, 0.012);
+  
+  // ETFs
+  const vymHistory = generatePriceHistory(125, 0.01);
+  const vymiHistory = generatePriceHistory(72, 0.012);
+  const gldmHistory = generatePriceHistory(58, 0.008);
+  const slvHistory = generatePriceHistory(28, 0.015);
   
   const getLastPrices = (history: PricePoint[]) => ({
     current: history[history.length - 1].close,
@@ -442,11 +447,14 @@ export function getCommodityData(): CommodityData[] {
   
   const gold = getLastPrices(goldHistory);
   const silver = getLastPrices(silverHistory);
-  const copper = getLastPrices(copperHistory);
   const bitcoin = getLastPrices(bitcoinHistory);
   const ethereum = getLastPrices(ethereumHistory);
   const nasdaq = getLastPrices(nasdaqHistory);
   const sp500 = getLastPrices(sp500History);
+  const vym = getLastPrices(vymHistory);
+  const vymi = getLastPrices(vymiHistory);
+  const gldm = getLastPrices(gldmHistory);
+  const slv = getLastPrices(slvHistory);
   
   return [
     // Metals
@@ -479,21 +487,6 @@ export function getCommodityData(): CommodityData[] {
       volume: '89.2K',
       marketCap: '$1.4T',
       priceHistory: silverHistory
-    },
-    {
-      id: 'copper',
-      name: 'Copper',
-      symbol: 'HG/USD',
-      category: 'metal',
-      price: copper.current,
-      priceUnit: '/oz',
-      change: copper.current - copper.previous,
-      changePercent: ((copper.current - copper.previous) / copper.previous) * 100,
-      high24h: copper.high,
-      low24h: copper.low,
-      volume: '234.8K',
-      marketCap: '$245B',
-      priceHistory: copperHistory
     },
     // Crypto
     {
@@ -556,6 +549,67 @@ export function getCommodityData(): CommodityData[] {
       volume: '3.8B',
       marketCap: '$42T',
       priceHistory: sp500History
+    },
+    // ETFs
+    {
+      id: 'vym',
+      name: 'Vanguard High Dividend Yield',
+      symbol: 'VYM',
+      category: 'etf',
+      price: vym.current,
+      priceUnit: '',
+      change: vym.current - vym.previous,
+      changePercent: ((vym.current - vym.previous) / vym.previous) * 100,
+      high24h: vym.high,
+      low24h: vym.low,
+      volume: '2.1M',
+      marketCap: '$56B',
+      priceHistory: vymHistory
+    },
+    {
+      id: 'vymi',
+      name: 'Vanguard Intl High Dividend',
+      symbol: 'VYMI',
+      category: 'etf',
+      price: vymi.current,
+      priceUnit: '',
+      change: vymi.current - vymi.previous,
+      changePercent: ((vymi.current - vymi.previous) / vymi.previous) * 100,
+      high24h: vymi.high,
+      low24h: vymi.low,
+      volume: '450K',
+      marketCap: '$8.5B',
+      priceHistory: vymiHistory
+    },
+    {
+      id: 'gldm',
+      name: 'SPDR Gold MiniShares',
+      symbol: 'GLDM',
+      category: 'etf',
+      price: gldm.current,
+      priceUnit: '',
+      change: gldm.current - gldm.previous,
+      changePercent: ((gldm.current - gldm.previous) / gldm.previous) * 100,
+      high24h: gldm.high,
+      low24h: gldm.low,
+      volume: '3.5M',
+      marketCap: '$9.2B',
+      priceHistory: gldmHistory
+    },
+    {
+      id: 'slv',
+      name: 'iShares Silver Trust',
+      symbol: 'SLV',
+      category: 'etf',
+      price: slv.current,
+      priceUnit: '',
+      change: slv.current - slv.previous,
+      changePercent: ((slv.current - slv.previous) / slv.previous) * 100,
+      high24h: slv.high,
+      low24h: slv.low,
+      volume: '12.5M',
+      marketCap: '$11.5B',
+      priceHistory: slvHistory
     }
   ];
 }
@@ -605,6 +659,7 @@ export function getCategoryIcon(category: CommodityData['category']): string {
     case 'metal': return '🏆';
     case 'crypto': return '₿';
     case 'index': return '📊';
+    case 'etf': return '📈';
     default: return '💰';
   }
 }
@@ -614,6 +669,7 @@ export function getCategoryLabel(category: CommodityData['category']): string {
     case 'metal': return 'Precious Metal';
     case 'crypto': return 'Cryptocurrency';
     case 'index': return 'Stock Index';
+    case 'etf': return 'ETF';
     default: return 'Asset';
   }
 }
