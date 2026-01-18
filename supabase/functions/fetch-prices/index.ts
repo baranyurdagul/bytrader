@@ -7,7 +7,7 @@ interface PriceData {
   id: string;
   name: string;
   symbol: string;
-  category: 'metal' | 'crypto' | 'index';
+  category: 'metal' | 'crypto' | 'index' | 'etf';
   price: number;
   priceUnit: string;
   change: number;
@@ -20,13 +20,17 @@ interface PriceData {
   dataSource: 'live' | 'simulated';
 }
 
-// Yahoo Finance tickers for commodities and indices
+// Yahoo Finance tickers for commodities, indices, and ETFs
 const YAHOO_TICKERS = {
   gold: 'GC=F',      // Gold Futures
   silver: 'SI=F',    // Silver Futures
-  copper: 'HG=F',    // Copper Futures
   nasdaq100: '^NDX', // Nasdaq 100 Index
   sp500: '^GSPC',    // S&P 500 Index
+  // ETFs
+  vym: 'VYM',        // Vanguard High Dividend Yield ETF
+  vymi: 'VYMI',      // Vanguard International High Dividend Yield ETF
+  gldm: 'GLDM',      // SPDR Gold MiniShares Trust
+  slv: 'SLV',        // iShares Silver Trust
 };
 
 // Fetch quote from Yahoo Finance
@@ -75,10 +79,9 @@ async function fetchYahooQuote(ticker: string): Promise<any | null> {
 async function fetchMetalPrices(): Promise<PriceData[]> {
   console.log('Fetching metal prices from Yahoo Finance...');
   
-  const [goldQuote, silverQuote, copperQuote] = await Promise.all([
+  const [goldQuote, silverQuote] = await Promise.all([
     fetchYahooQuote(YAHOO_TICKERS.gold),
     fetchYahooQuote(YAHOO_TICKERS.silver),
-    fetchYahooQuote(YAHOO_TICKERS.copper),
   ]);
   
   const results: PriceData[] = [];
@@ -123,26 +126,6 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
     });
   }
   
-  if (copperQuote?.price) {
-    const change = copperQuote.price - (copperQuote.previousClose || copperQuote.price);
-    results.push({
-      id: 'copper',
-      name: 'Copper',
-      symbol: 'HG/USD',
-      category: 'metal',
-      price: copperQuote.price,
-      priceUnit: '/lb',
-      change,
-      changePercent: copperQuote.previousClose ? (change / copperQuote.previousClose) * 100 : 0,
-      high24h: copperQuote.high || copperQuote.price,
-      low24h: copperQuote.low || copperQuote.price,
-      volume: formatVolume(copperQuote.volume || 234000),
-      marketCap: '$320B',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'live',
-    });
-  }
-  
   // If Yahoo Finance failed, use fallback
   if (results.length === 0) {
     console.log('Yahoo Finance failed for metals, using fallback');
@@ -153,9 +136,68 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
   const fallback = getMetalFallbackData();
   if (!results.find(r => r.id === 'gold')) results.push(fallback.find(f => f.id === 'gold')!);
   if (!results.find(r => r.id === 'silver')) results.push(fallback.find(f => f.id === 'silver')!);
-  if (!results.find(r => r.id === 'copper')) results.push(fallback.find(f => f.id === 'copper')!);
   
   console.log(`Fetched ${results.filter(r => r.dataSource === 'live').length} live metal prices`);
+  return results;
+}
+
+// Fetch ETF prices from Yahoo Finance
+async function fetchETFPrices(): Promise<PriceData[]> {
+  console.log('Fetching ETF prices from Yahoo Finance...');
+  
+  const [vymQuote, vymiQuote, gldmQuote, slvQuote] = await Promise.all([
+    fetchYahooQuote(YAHOO_TICKERS.vym),
+    fetchYahooQuote(YAHOO_TICKERS.vymi),
+    fetchYahooQuote(YAHOO_TICKERS.gldm),
+    fetchYahooQuote(YAHOO_TICKERS.slv),
+  ]);
+  
+  const results: PriceData[] = [];
+  
+  const etfConfigs = [
+    { quote: vymQuote, id: 'vym', name: 'Vanguard High Dividend Yield', symbol: 'VYM', marketCap: '$56B' },
+    { quote: vymiQuote, id: 'vymi', name: 'Vanguard Intl High Dividend', symbol: 'VYMI', marketCap: '$8.5B' },
+    { quote: gldmQuote, id: 'gldm', name: 'SPDR Gold MiniShares', symbol: 'GLDM', marketCap: '$9.2B' },
+    { quote: slvQuote, id: 'slv', name: 'iShares Silver Trust', symbol: 'SLV', marketCap: '$11.5B' },
+  ];
+  
+  for (const config of etfConfigs) {
+    if (config.quote?.price) {
+      const change = config.quote.price - (config.quote.previousClose || config.quote.price);
+      results.push({
+        id: config.id,
+        name: config.name,
+        symbol: config.symbol,
+        category: 'etf',
+        price: config.quote.price,
+        priceUnit: '',
+        change,
+        changePercent: config.quote.previousClose ? (change / config.quote.previousClose) * 100 : 0,
+        high24h: config.quote.high || config.quote.price,
+        low24h: config.quote.low || config.quote.price,
+        volume: formatVolume(config.quote.volume || 1000000),
+        marketCap: config.marketCap,
+        lastUpdated: new Date().toISOString(),
+        dataSource: 'live',
+      });
+    }
+  }
+  
+  // If Yahoo Finance failed, use fallback
+  if (results.length === 0) {
+    console.log('Yahoo Finance failed for ETFs, using fallback');
+    return getETFFallbackData();
+  }
+  
+  // Fill in any missing ETFs with fallback
+  const fallback = getETFFallbackData();
+  for (const fb of fallback) {
+    if (!results.find(r => r.id === fb.id)) {
+      results.push(fb);
+    }
+  }
+  
+  console.log(`Fetched ${results.filter(r => r.dataSource === 'live').length} live ETF prices`);
   return results;
 }
 
@@ -265,7 +307,6 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
 function getMetalFallbackData(): PriceData[] {
   const goldBase = 4500 + (Math.random() - 0.5) * 50;
   const silverBase = 90 + (Math.random() - 0.5) * 3;
-  const copperBase = 5.50 + (Math.random() - 0.5) * 0.15;
   
   return [
     {
@@ -300,19 +341,77 @@ function getMetalFallbackData(): PriceData[] {
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
     },
+  ];
+}
+
+function getETFFallbackData(): PriceData[] {
+  const vymBase = 125 + (Math.random() - 0.5) * 2;
+  const vymiBase = 72 + (Math.random() - 0.5) * 1.5;
+  const gldmBase = 58 + (Math.random() - 0.5) * 1;
+  const slvBase = 28 + (Math.random() - 0.5) * 0.5;
+  
+  return [
     {
-      id: 'copper',
-      name: 'Copper',
-      symbol: 'HG/USD',
-      category: 'metal',
-      price: copperBase,
-      priceUnit: '/lb',
-      change: (Math.random() - 0.5) * 0.08,
+      id: 'vym',
+      name: 'Vanguard High Dividend Yield',
+      symbol: 'VYM',
+      category: 'etf',
+      price: vymBase,
+      priceUnit: '',
+      change: (Math.random() - 0.5) * 1.5,
+      changePercent: (Math.random() - 0.5) * 1.2,
+      high24h: vymBase * 1.005,
+      low24h: vymBase * 0.995,
+      volume: '2.1M',
+      marketCap: '$56B',
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
+    },
+    {
+      id: 'vymi',
+      name: 'Vanguard Intl High Dividend',
+      symbol: 'VYMI',
+      category: 'etf',
+      price: vymiBase,
+      priceUnit: '',
+      change: (Math.random() - 0.5) * 1,
+      changePercent: (Math.random() - 0.5) * 1.4,
+      high24h: vymiBase * 1.006,
+      low24h: vymiBase * 0.994,
+      volume: '450K',
+      marketCap: '$8.5B',
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
+    },
+    {
+      id: 'gldm',
+      name: 'SPDR Gold MiniShares',
+      symbol: 'GLDM',
+      category: 'etf',
+      price: gldmBase,
+      priceUnit: '',
+      change: (Math.random() - 0.5) * 0.8,
+      changePercent: (Math.random() - 0.5) * 1.3,
+      high24h: gldmBase * 1.004,
+      low24h: gldmBase * 0.996,
+      volume: '3.5M',
+      marketCap: '$9.2B',
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'simulated',
+    },
+    {
+      id: 'slv',
+      name: 'iShares Silver Trust',
+      symbol: 'SLV',
+      category: 'etf',
+      price: slvBase,
+      priceUnit: '',
+      change: (Math.random() - 0.5) * 0.6,
       changePercent: (Math.random() - 0.5) * 2,
-      high24h: copperBase * 1.01,
-      low24h: copperBase * 0.99,
-      volume: '234.8K',
-      marketCap: '$320B',
+      high24h: slvBase * 1.008,
+      low24h: slvBase * 0.992,
+      volume: '12.5M',
+      marketCap: '$11.5B',
       lastUpdated: new Date().toISOString(),
       dataSource: 'simulated',
     },
@@ -422,14 +521,15 @@ Deno.serve(async (req) => {
     console.log('Fetching live prices from Yahoo Finance + CoinGecko...');
     
     // Fetch from all sources in parallel
-    const [metalPrices, cryptoPrices, indicesPrices] = await Promise.all([
+    const [metalPrices, cryptoPrices, indicesPrices, etfPrices] = await Promise.all([
       fetchMetalPrices(),
       fetchCryptoPrices(),
       fetchIndicesPrices(),
+      fetchETFPrices(),
     ]);
     
     // Combine all prices
-    const allPrices = [...metalPrices, ...cryptoPrices, ...indicesPrices];
+    const allPrices = [...metalPrices, ...cryptoPrices, ...indicesPrices, ...etfPrices];
     
     const liveCount = allPrices.filter(p => p.dataSource === 'live').length;
     console.log(`Fetched ${allPrices.length} prices (${liveCount} live, ${allPrices.length - liveCount} simulated)`);

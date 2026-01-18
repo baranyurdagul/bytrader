@@ -3,7 +3,7 @@ import { PricePoint } from '@/lib/tradingData';
 
 interface UseHistoricalPricesOptions {
   assetId: string;
-  category: 'metal' | 'crypto' | 'index';
+  category: 'metal' | 'crypto' | 'index' | 'etf';
   days: number;
   interval?: '1h' | '1d';
 }

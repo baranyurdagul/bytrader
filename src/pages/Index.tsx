@@ -55,6 +55,7 @@ const Index = () => {
   const metalAssets = commodities.filter(c => c.category === 'metal');
   const cryptoAssets = commodities.filter(c => c.category === 'crypto');
   const indexAssets = commodities.filter(c => c.category === 'index');
+  const etfAssets = commodities.filter(c => c.category === 'etf');
   
   // Get watchlist commodities
   const watchlistCommodities = useMemo(() => {
@@ -301,12 +302,36 @@ const Index = () => {
         </section>
 
         {/* Indices Section */}
-        <section className="mb-8">
+        <section className="mb-6">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             📊 Stock Indices
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {indexAssets.map((commodity) => (
+              <CommodityCard
+                key={commodity.id}
+                commodity={commodity}
+                isSelected={false}
+                onClick={() => handleAssetClick(commodity.id)}
+                isInWatchlist={isInWatchlist(commodity.id)}
+                onToggleWatchlist={() => toggleWatchlist({
+                  asset_id: commodity.id,
+                  asset_name: commodity.name,
+                  asset_symbol: commodity.symbol,
+                })}
+                showWatchlistButton={isAuthenticated}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* ETFs Section */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            📈 ETFs
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {etfAssets.map((commodity) => (
               <CommodityCard
                 key={commodity.id}
                 commodity={commodity}

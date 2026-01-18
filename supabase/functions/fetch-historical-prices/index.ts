@@ -16,9 +16,13 @@ interface HistoricalPrice {
 const YAHOO_TICKERS: Record<string, string> = {
   gold: 'GC=F',
   silver: 'SI=F',
-  copper: 'HG=F',
   nasdaq100: '^NDX',
   sp500: '^GSPC',
+  // ETFs
+  vym: 'VYM',
+  vymi: 'VYMI',
+  gldm: 'GLDM',
+  slv: 'SLV',
 };
 
 // Fetch historical data from Yahoo Finance
@@ -150,6 +154,21 @@ async function fetchIndexHistory(indexId: string, days: number = 365, interval: 
   return generateRealisticHistory(indexId, days, undefined, interval);
 }
 
+// Fetch historical ETF prices from Yahoo Finance
+async function fetchETFHistory(etfId: string, days: number = 365, interval: string = '1d'): Promise<HistoricalPrice[]> {
+  const ticker = YAHOO_TICKERS[etfId];
+  
+  if (ticker) {
+    const history = await fetchYahooHistory(ticker, days, interval);
+    if (history.length > 0) {
+      return history;
+    }
+  }
+  
+  console.log(`Using generated data for ${etfId}`);
+  return generateRealisticHistory(etfId, days, undefined, interval);
+}
+
 // Generate realistic price history based on asset type and current price ranges (fallback)
 // Prices as of Jan 2026
 function generateRealisticHistory(assetId: string, days: number, endPrice?: number, interval: string = '1d'): HistoricalPrice[] {
@@ -160,11 +179,15 @@ function generateRealisticHistory(assetId: string, days: number, endPrice?: numb
   const priceRanges: Record<string, { current: number; yearAgoRange: [number, number]; volatility: number }> = {
     gold: { current: endPrice || 4500, yearAgoRange: [2600, 2750], volatility: 0.008 },
     silver: { current: endPrice || 90, yearAgoRange: [30, 35], volatility: 0.012 },
-    copper: { current: endPrice || 5.50, yearAgoRange: [4.00, 4.50], volatility: 0.015 },
     bitcoin: { current: endPrice || 95000, yearAgoRange: [40000, 50000], volatility: 0.04 },
     ethereum: { current: endPrice || 3300, yearAgoRange: [2200, 2800], volatility: 0.045 },
     nasdaq100: { current: endPrice || 21500, yearAgoRange: [16000, 18000], volatility: 0.015 },
     sp500: { current: endPrice || 5900, yearAgoRange: [4800, 5200], volatility: 0.012 },
+    // ETFs
+    vym: { current: endPrice || 125, yearAgoRange: [110, 118], volatility: 0.01 },
+    vymi: { current: endPrice || 72, yearAgoRange: [62, 68], volatility: 0.012 },
+    gldm: { current: endPrice || 58, yearAgoRange: [38, 42], volatility: 0.008 },
+    slv: { current: endPrice || 28, yearAgoRange: [20, 24], volatility: 0.015 },
   };
   
   const config = priceRanges[assetId] || { current: endPrice || 100, yearAgoRange: [80, 120], volatility: 0.02 };
@@ -235,6 +258,8 @@ Deno.serve(async (req) => {
       history = await fetchMetalHistory(assetId, days, interval);
     } else if (category === 'index') {
       history = await fetchIndexHistory(assetId, days, interval);
+    } else if (category === 'etf') {
+      history = await fetchETFHistory(assetId, days, interval);
     } else {
       history = generateRealisticHistory(assetId, days, undefined, interval);
     }
