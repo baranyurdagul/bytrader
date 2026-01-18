@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { DOMParser, Element } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,40 +21,22 @@ interface NewsItem {
 
 // Map asset IDs to Yahoo Finance ticker symbols for RSS feeds
 const TICKER_MAP: Record<string, string> = {
-  // Metals
   'gold': 'GC=F',
   'silver': 'SI=F',
   'XAU/USD': 'GC=F',
   'XAG/USD': 'SI=F',
-  // Crypto
   'bitcoin': 'BTC-USD',
   'ethereum': 'ETH-USD',
   'BTC/USD': 'BTC-USD',
   'ETH/USD': 'ETH-USD',
-  // Indices
   'nasdaq100': '^NDX',
   'sp500': '^GSPC',
   'NDX': '^NDX',
   'SPX': '^GSPC',
-  // ETFs
   'vym': 'VYM',
   'vymi': 'VYMI',
   'gldm': 'GLDM',
   'slv': 'SLV',
-};
-
-// Keywords for general market news searches
-const SEARCH_KEYWORDS: Record<string, string[]> = {
-  'gold': ['gold', 'precious metals', 'gold price'],
-  'silver': ['silver', 'precious metals', 'silver price'],
-  'bitcoin': ['bitcoin', 'cryptocurrency', 'BTC'],
-  'ethereum': ['ethereum', 'cryptocurrency', 'ETH'],
-  'nasdaq100': ['nasdaq', 'tech stocks', 'nasdaq 100'],
-  'sp500': ['S&P 500', 'stock market', 'wall street'],
-  'vym': ['dividend ETF', 'VYM', 'Vanguard dividend'],
-  'vymi': ['international dividend', 'VYMI', 'Vanguard international'],
-  'gldm': ['gold ETF', 'GLDM', 'gold fund'],
-  'slv': ['silver ETF', 'SLV', 'silver fund'],
 };
 
 // Simple sentiment analysis based on keywords
@@ -90,7 +71,7 @@ function analyzeSentiment(text: string): 'positive' | 'negative' | 'neutral' {
   return 'neutral';
 }
 
-// Parse relative timestamp
+// Format timestamp
 function formatTimestamp(pubDate: string): string {
   try {
     const date = new Date(pubDate);
@@ -110,10 +91,37 @@ function formatTimestamp(pubDate: string): string {
   }
 }
 
-// Extract text content from an element by tag name
-function getElementText(parent: Element, tagName: string): string {
-  const el = parent.getElementsByTagName(tagName)[0];
-  return el?.textContent?.trim() || '';
+// Extract text between XML tags using regex
+function extractTag(xml: string, tag: string): string {
+  const regex = new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>|<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i');
+  const match = xml.match(regex);
+  if (match) {
+    return (match[1] || match[2] || '').trim();
+  }
+  return '';
+}
+
+// Parse RSS XML using regex (works in Deno edge functions)
+function parseRSSItems(xml: string): Array<{ title: string; link: string; description: string; pubDate: string }> {
+  const items: Array<{ title: string; link: string; description: string; pubDate: string }> = [];
+  
+  // Find all <item> blocks
+  const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+  let match;
+  
+  while ((match = itemRegex.exec(xml)) !== null) {
+    const itemXml = match[1];
+    const title = extractTag(itemXml, 'title');
+    const link = extractTag(itemXml, 'link');
+    const description = extractTag(itemXml, 'description');
+    const pubDate = extractTag(itemXml, 'pubDate');
+    
+    if (title) {
+      items.push({ title, link, description, pubDate });
+    }
+  }
+  
+  return items;
 }
 
 // Fetch news from Yahoo Finance RSS
@@ -134,38 +142,23 @@ async function fetchYahooRSS(ticker: string): Promise<NewsItem[]> {
     }
     
     const xml = await response.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, 'text/xml');
+    console.log(`Received ${xml.length} bytes of XML`);
     
-    if (!doc) {
-      console.error('Failed to parse XML');
-      return [];
-    }
+    const items = parseRSSItems(xml);
+    console.log(`Parsed ${items.length} items`);
     
-    const items = doc.getElementsByTagName('item');
-    const news: NewsItem[] = [];
-    
-    for (let i = 0; i < Math.min(items.length, 5); i++) {
-      const item = items[i] as Element;
-      const title = getElementText(item, 'title');
-      const link = getElementText(item, 'link');
-      const description = getElementText(item, 'description');
-      const pubDate = getElementText(item, 'pubDate');
+    const news: NewsItem[] = items.slice(0, 5).map(item => {
+      const cleanDescription = item.description.replace(/<[^>]*>/g, '').trim();
       
-      if (title) {
-        // Clean up description (remove HTML tags)
-        const cleanDescription = description.replace(/<[^>]*>/g, '').trim();
-        
-        news.push({
-          title,
-          summary: cleanDescription || title,
-          sentiment: analyzeSentiment(title + ' ' + cleanDescription),
-          timestamp: formatTimestamp(pubDate),
-          url: link,
-          source: 'Yahoo Finance',
-        });
-      }
-    }
+      return {
+        title: item.title,
+        summary: cleanDescription || item.title,
+        sentiment: analyzeSentiment(item.title + ' ' + cleanDescription),
+        timestamp: formatTimestamp(item.pubDate),
+        url: item.link,
+        source: 'Yahoo Finance',
+      };
+    });
     
     return news;
   } catch (error) {
@@ -192,36 +185,20 @@ async function fetchGeneralFinanceNews(): Promise<NewsItem[]> {
     }
     
     const xml = await response.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, 'text/xml');
+    const items = parseRSSItems(xml);
     
-    if (!doc) return [];
-    
-    const items = doc.getElementsByTagName('item');
-    const news: NewsItem[] = [];
-    
-    for (let i = 0; i < Math.min(items.length, 10); i++) {
-      const item = items[i] as Element;
-      const title = getElementText(item, 'title');
-      const link = getElementText(item, 'link');
-      const description = getElementText(item, 'description');
-      const pubDate = getElementText(item, 'pubDate');
+    return items.slice(0, 10).map(item => {
+      const cleanDescription = item.description.replace(/<[^>]*>/g, '').trim();
       
-      if (title) {
-        const cleanDescription = description.replace(/<[^>]*>/g, '').trim();
-        
-        news.push({
-          title,
-          summary: cleanDescription || title,
-          sentiment: analyzeSentiment(title + ' ' + cleanDescription),
-          timestamp: formatTimestamp(pubDate),
-          url: link,
-          source: 'Yahoo Finance',
-        });
-      }
-    }
-    
-    return news;
+      return {
+        title: item.title,
+        summary: cleanDescription || item.title,
+        sentiment: analyzeSentiment(item.title + ' ' + cleanDescription),
+        timestamp: formatTimestamp(item.pubDate),
+        url: item.link,
+        source: 'Yahoo Finance',
+      };
+    });
   } catch (error) {
     console.error('Error fetching general news:', error);
     return [];
@@ -229,7 +206,6 @@ async function fetchGeneralFinanceNews(): Promise<NewsItem[]> {
 }
 
 serve(async (req: Request) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -246,28 +222,23 @@ serve(async (req: Request) => {
 
     console.log(`Fetching real news for ${assetName} (${assetSymbol})`);
 
-    // Get ticker symbol for the asset
     const assetId = assetName.toLowerCase().replace(/\s+/g, '');
     const ticker = TICKER_MAP[assetId] || TICKER_MAP[assetSymbol] || assetSymbol;
     
     console.log(`Using ticker: ${ticker}`);
     
-    // Fetch ticker-specific news
     let news = await fetchYahooRSS(ticker);
     
-    // If no ticker-specific news, try general finance news and filter
     if (news.length === 0) {
       console.log('No ticker-specific news, fetching general news...');
       const generalNews = await fetchGeneralFinanceNews();
       
-      // Filter by keywords if we have them
-      const keywords = SEARCH_KEYWORDS[assetId] || [assetName.toLowerCase()];
+      const keywords = [assetName.toLowerCase(), assetSymbol.toLowerCase()];
       news = generalNews.filter(item => {
         const text = (item.title + ' ' + item.summary).toLowerCase();
-        return keywords.some(kw => text.includes(kw.toLowerCase()));
+        return keywords.some(kw => text.includes(kw));
       }).slice(0, 5);
       
-      // If still no news, just return top general news
       if (news.length === 0) {
         news = generalNews.slice(0, 5);
       }
