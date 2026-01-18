@@ -10,6 +10,7 @@ import Alerts from "./pages/Alerts";
 import Install from "./pages/Install";
 import AssetDetail from "./pages/AssetDetail";
 import Assistant from "./pages/Assistant";
+import News from "./pages/News";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/assistant" element={<Assistant />} />
+          <Route path="/news" element={<News />} />
           <Route path="/install" element={<Install />} />
           <Route path="/asset/:assetId" element={<AssetDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
