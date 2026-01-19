@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout';
 import { CommodityCard, PriceUnit } from '@/components/CommodityCard';
 import { AddAlertDialog } from '@/components/AddAlertDialog';
 import { AlertsList } from '@/components/AlertsList';
+import { DataFreshnessIndicator } from '@/components/DataFreshnessIndicator';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { usePriceAlerts } from '@/hooks/usePriceAlerts';
 import { useWatchlist } from '@/hooks/useWatchlist';
@@ -17,7 +18,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 const Index = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { commodities: liveCommodities, isLoading, error, lastUpdated, refetch } = useLivePrices(60000);
+  const { commodities: liveCommodities, isLoading, error, lastUpdated, dataFreshness, refetch } = useLivePrices(60000);
   const { 
     alerts, 
     addAlert, 
@@ -74,7 +75,7 @@ const Index = () => {
       <main className="container mx-auto px-4 py-6">
         {/* Connection Status Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 p-3 rounded-lg bg-card border border-border">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {error ? (
               <>
                 <WifiOff className="w-4 h-4 text-warning" />
@@ -86,8 +87,16 @@ const Index = () => {
               <>
                 <Wifi className="w-4 h-4 text-success" />
                 <span className="text-sm text-muted-foreground">
-                  Live prices {lastUpdated && `• Updated ${lastUpdated.toLocaleTimeString()}`}
+                  Live prices
                 </span>
+                {commodities.length > 0 && (
+                  <DataFreshnessIndicator
+                    lastUpdated={dataFreshness.lastPriceUpdate}
+                    historicalFetchedAt={dataFreshness.lastHistoricalFetch}
+                    dataSource={commodities[0]?.dataSource || 'live'}
+                    sourceProvider="Yahoo Finance / CoinGecko"
+                  />
+                )}
               </>
             )}
           </div>

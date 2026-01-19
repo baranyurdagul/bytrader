@@ -23,16 +23,37 @@ interface LivePriceData {
 }
 
 // Cache for historical price data - persist across renders
-const historicalCache: Map<string, { data: PricePoint[], timestamp: number, dataSource: 'live' | 'simulated' }> = new Map();
+interface HistoricalCacheEntry {
+  data: PricePoint[];
+  timestamp: number;
+  dataSource: 'live' | 'simulated';
+  sourceProvider: string;
+}
+const historicalCache: Map<string, HistoricalCacheEntry> = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+// Get source provider based on category
+function getSourceProvider(category: string): string {
+  return category === 'crypto' ? 'CoinGecko' : 'Yahoo Finance';
+}
+
 // Fetch real historical prices from edge function
-async function fetchHistoricalPrices(assetId: string, category: string, days: number = 365): Promise<{ data: PricePoint[], dataSource: 'live' | 'simulated' }> {
+async function fetchHistoricalPrices(
+  assetId: string, 
+  category: string, 
+  days: number = 365
+): Promise<{ data: PricePoint[], dataSource: 'live' | 'simulated', sourceProvider: string, fetchedAt: Date }> {
   const cacheKey = `${assetId}-${days}`;
   const cached = historicalCache.get(cacheKey);
+  const sourceProvider = getSourceProvider(category);
   
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return { data: cached.data, dataSource: cached.dataSource };
+    return { 
+      data: cached.data, 
+      dataSource: cached.dataSource, 
+      sourceProvider: cached.sourceProvider,
+      fetchedAt: new Date(cached.timestamp)
+    };
   }
   
   try {
@@ -64,9 +85,15 @@ async function fetchHistoricalPrices(assetId: string, category: string, days: nu
       
       // Determine if data is from real API or generated
       const dataSource: 'live' | 'simulated' = priceHistory.length > 10 ? 'live' : 'simulated';
+      const fetchedAt = new Date();
       
-      historicalCache.set(cacheKey, { data: priceHistory, timestamp: Date.now(), dataSource });
-      return { data: priceHistory, dataSource };
+      historicalCache.set(cacheKey, { 
+        data: priceHistory, 
+        timestamp: fetchedAt.getTime(), 
+        dataSource,
+        sourceProvider 
+      });
+      return { data: priceHistory, dataSource, sourceProvider, fetchedAt };
     }
     
     throw new Error('Invalid response format or empty data');
@@ -74,10 +101,21 @@ async function fetchHistoricalPrices(assetId: string, category: string, days: nu
     console.warn(`Using cached/fallback history for ${assetId}:`, error);
     // Return existing cache if available, even if expired
     if (cached) {
-      return { data: cached.data, dataSource: cached.dataSource };
+      return { 
+        data: cached.data, 
+        dataSource: cached.dataSource, 
+        sourceProvider: cached.sourceProvider,
+        fetchedAt: new Date(cached.timestamp)
+      };
     }
-    return { data: [], dataSource: 'simulated' };
+    return { data: [], dataSource: 'simulated', sourceProvider, fetchedAt: new Date() };
   }
+}
+
+export interface DataFreshnessInfo {
+  lastPriceUpdate: Date | null;
+  lastHistoricalFetch: Date | null;
+  sourceProviders: Map<string, string>; // assetId -> provider
 }
 
 export function useLivePrices(refreshInterval: number = 60000) {
@@ -85,6 +123,11 @@ export function useLivePrices(refreshInterval: number = 60000) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [dataFreshness, setDataFreshness] = useState<DataFreshnessInfo>({
+    lastPriceUpdate: null,
+    lastHistoricalFetch: null,
+    sourceProviders: new Map(),
+  });
   const { toast } = useToast();
   const hasShownToast = useRef(false);
   const isFetching = useRef(false);
@@ -114,6 +157,18 @@ export function useLivePrices(refreshInterval: number = 60000) {
       
       const historicalResults = await Promise.all(historicalPromises);
       
+      // Build source providers map and track latest historical fetch time
+      const newSourceProviders = new Map<string, string>();
+      let latestHistFetch: Date | null = null;
+      
+      historicalResults.forEach((histResult, index) => {
+        const assetId = livePrices[index].id;
+        newSourceProviders.set(assetId, histResult.sourceProvider);
+        if (!latestHistFetch || histResult.fetchedAt > latestHistFetch) {
+          latestHistFetch = histResult.fetchedAt;
+        }
+      });
+      
       // Convert to CommodityData format with real historical data
       const commodityData: CommodityData[] = livePrices.map((item, index) => {
         const histResult = historicalResults[index];
@@ -133,13 +188,20 @@ export function useLivePrices(refreshInterval: number = 60000) {
           marketCap: item.marketCap,
           priceHistory: histResult.data,
           dataSource: item.dataSource || histResult.dataSource,
+          sourceProvider: histResult.sourceProvider,
           dividendYield: item.dividendYield,
           expenseRatio: item.expenseRatio,
         };
       });
       
+      const now = new Date();
       setCommodities(commodityData);
-      setLastUpdated(new Date());
+      setLastUpdated(now);
+      setDataFreshness({
+        lastPriceUpdate: now,
+        lastHistoricalFetch: latestHistFetch,
+        sourceProviders: newSourceProviders,
+      });
       setError(null);
       hasShownToast.current = false;
     } catch (err) {
@@ -182,6 +244,7 @@ export function useLivePrices(refreshInterval: number = 60000) {
     isLoading,
     error,
     lastUpdated,
+    dataFreshness,
     refetch,
   };
 }
