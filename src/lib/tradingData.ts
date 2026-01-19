@@ -626,6 +626,19 @@ export function getCommodityData(): CommodityData[] {
 }
 
 export function getTechnicalIndicators(priceHistory: PricePoint[]): TechnicalIndicators {
+  // Handle empty or insufficient price history
+  if (!priceHistory || priceHistory.length < 2) {
+    return {
+      rsi: 50,
+      macd: { value: 0, signal: 0, histogram: 0 },
+      movingAverages: { sma20: 0, sma50: 0, sma200: 0, ema12: 0, ema26: 0 },
+      bollingerBands: { upper: 0, middle: 0, lower: 0 },
+      stochastic: { k: 50, d: 50 },
+      atr: 0,
+      adx: 25
+    };
+  }
+  
   const closes = priceHistory.map(p => p.close);
   
   return {
@@ -650,6 +663,25 @@ export function getSignal(indicators: TechnicalIndicators, currentPrice: number,
 }
 
 export function getTrendAnalysis(priceHistory: PricePoint[], currentPrice: number): TrendAnalysis {
+  // Handle empty or insufficient price history
+  if (!priceHistory || priceHistory.length < 2) {
+    return {
+      direction: 'NEUTRAL',
+      strength: 50,
+      support: currentPrice * 0.95,
+      resistance: currentPrice * 1.05,
+      pivotPoints: {
+        pp: currentPrice,
+        r1: currentPrice * 1.02,
+        r2: currentPrice * 1.04,
+        r3: currentPrice * 1.06,
+        s1: currentPrice * 0.98,
+        s2: currentPrice * 0.96,
+        s3: currentPrice * 0.94,
+      }
+    };
+  }
+  
   return calculateTrendAnalysis(priceHistory, currentPrice);
 }
 
