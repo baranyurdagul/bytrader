@@ -30,7 +30,9 @@ async function fetchYahooHistory(ticker: string, days: number, interval: string 
   try {
     // Calculate date range
     const endDate = Math.floor(Date.now() / 1000);
-    const startDate = endDate - (days * 24 * 60 * 60);
+    // For hourly data, extend to 5 days to ensure we get enough data points (markets closed on weekends)
+    const actualDays = (interval === '1h' || interval === '60m') ? Math.max(days, 5) : days;
+    const startDate = endDate - (actualDays * 24 * 60 * 60);
     
     // Yahoo Finance interval mapping
     const yahooInterval = interval === '1h' ? '60m' : interval === '15m' ? '15m' : '1d';
@@ -75,6 +77,24 @@ async function fetchYahooHistory(ticker: string, days: number, interval: string 
       }
     }
     
+    // For hourly data, only return the last 24 hours of data points (or less if market closed)
+    // But ensure we have enough points for a meaningful chart
+    if (interval === '1h' || interval === '60m') {
+      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+      const recentHistory = history.filter(h => h.timestamp >= oneDayAgo);
+      
+      // If we have at least some recent data, use it; otherwise use last 24 points
+      if (recentHistory.length >= 6) {
+        console.log(`Fetched ${recentHistory.length} hourly points from Yahoo Finance for ${ticker}`);
+        return recentHistory;
+      } else if (history.length > 0) {
+        // Return the most recent 24 hourly points we have
+        const last24 = history.slice(-24);
+        console.log(`Fetched ${last24.length} hourly points (extended range) from Yahoo Finance for ${ticker}`);
+        return last24;
+      }
+    }
+    
     console.log(`Fetched ${history.length} historical points from Yahoo Finance for ${ticker} (${yahooInterval})`);
     return history;
   } catch (error) {
@@ -101,12 +121,12 @@ async function fetchMetalHistory(metal: string, days: number = 365, interval: st
 // Fetch historical crypto prices from CoinGecko (free, supports 1 year)
 async function fetchCryptoHistory(coinId: string, days: number = 365, interval: string = '1d'): Promise<HistoricalPrice[]> {
   try {
-    // CoinGecko uses different precision for different time ranges
-    // For hourly data (1 day), we need to request granular data
-    const cgInterval = days <= 1 ? '' : 'daily'; // CoinGecko auto-selects for <1 day
+    // CoinGecko: for days=1, it returns ~5 minute granularity
+    // We need to sample this down to hourly for consistent display
+    const isHourly = interval === '1h' || interval === '60m';
     
     const response = await fetch(
-      `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}${cgInterval ? `&interval=${cgInterval}` : ''}`
+      `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`
     );
     
     if (!response.ok) {
@@ -120,15 +140,31 @@ async function fetchCryptoHistory(coinId: string, days: number = 365, interval: 
       return generateRealisticHistory(coinId, days, undefined, interval);
     }
     
-    console.log(`Fetched ${data.prices.length} historical points from CoinGecko for ${coinId}`);
+    let prices = data.prices;
     
-    return data.prices.map((pricePoint: [number, number], index: number) => {
+    // For 1D hourly view, CoinGecko returns 5-min data, so sample to hourly
+    if (isHourly && prices.length > 24) {
+      const hourlyPrices: typeof prices = [];
+      const interval = Math.floor(prices.length / 24);
+      for (let i = 0; i < prices.length; i += interval) {
+        hourlyPrices.push(prices[i]);
+      }
+      // Always include the last point for current price
+      if (hourlyPrices[hourlyPrices.length - 1] !== prices[prices.length - 1]) {
+        hourlyPrices.push(prices[prices.length - 1]);
+      }
+      prices = hourlyPrices.slice(-25); // Last 24-25 hours
+    }
+    
+    console.log(`Fetched ${prices.length} historical points from CoinGecko for ${coinId}`);
+    
+    return prices.map((pricePoint: [number, number], index: number) => {
       const [timestamp, price] = pricePoint;
       return {
         timestamp,
-        open: price * (1 + (Math.random() - 0.5) * 0.02),
-        high: price * (1 + Math.random() * 0.03),
-        low: price * (1 - Math.random() * 0.03),
+        open: price * (1 + (Math.random() - 0.5) * 0.005),
+        high: price * (1 + Math.random() * 0.01),
+        low: price * (1 - Math.random() * 0.01),
         close: price,
         volume: data.total_volumes?.[index]?.[1] || Math.floor(Math.random() * 10000000000),
       };
@@ -265,12 +301,15 @@ Deno.serve(async (req) => {
     }
     
     // Determine if data came from real API or was generated
+    // For hourly data, even 6+ points is valid live data
+    const isHourly = interval === '1h' || interval === '60m';
     const isLiveData = history.length > 0 && (
+      isHourly ? history.length >= 6 :
       (category === 'crypto' && history.length > 50) ||
       (category !== 'crypto' && history.length > 30)
     );
     
-    console.log(`Returning ${history.length} price points (${isLiveData ? 'live' : 'simulated'})`);
+    console.log(`Returning ${history.length} price points (${isLiveData ? 'live' : 'simulated'}) for ${interval}`);
     
     return new Response(
       JSON.stringify({ 
