@@ -1,6 +1,7 @@
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { PullToRefresh } from '@/components/PullToRefresh';
+import { FloatingChat } from '@/components/FloatingChat';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
@@ -52,6 +53,9 @@ export function Layout({ children, showHeader = true }: LayoutProps) {
       
       {/* Bottom nav only on mobile */}
       {isMobile && <BottomNav />}
+      
+      {/* Floating AI Chat */}
+      <FloatingChat />
     </div>
   );
 }
