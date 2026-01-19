@@ -77,22 +77,13 @@ async function fetchYahooHistory(ticker: string, days: number, interval: string 
       }
     }
     
-    // For hourly data, only return the last 24 hours of data points (or less if market closed)
-    // But ensure we have enough points for a meaningful chart
+    // For hourly data, return the most recent 24 data points we have
+    // This ensures we show a full day's worth of trading data even when markets are closed
     if (interval === '1h' || interval === '60m') {
-      const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-      const recentHistory = history.filter(h => h.timestamp >= oneDayAgo);
-      
-      // If we have at least some recent data, use it; otherwise use last 24 points
-      if (recentHistory.length >= 6) {
-        console.log(`Fetched ${recentHistory.length} hourly points from Yahoo Finance for ${ticker}`);
-        return recentHistory;
-      } else if (history.length > 0) {
-        // Return the most recent 24 hourly points we have
-        const last24 = history.slice(-24);
-        console.log(`Fetched ${last24.length} hourly points (extended range) from Yahoo Finance for ${ticker}`);
-        return last24;
-      }
+      // Always return the last 24 points for a complete chart
+      const last24 = history.slice(-24);
+      console.log(`Fetched ${last24.length} hourly points from Yahoo Finance for ${ticker}`);
+      return last24;
     }
     
     console.log(`Fetched ${history.length} historical points from Yahoo Finance for ${ticker} (${yahooInterval})`);
