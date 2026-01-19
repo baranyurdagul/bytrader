@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Wallet, Bell, Newspaper, Bot } from 'lucide-react';
+import { Home, Wallet, Bell, Newspaper, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -13,9 +13,9 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/', icon: Home, label: 'Markets' },
   { path: '/portfolio', icon: Wallet, label: 'Portfolio' },
+  { path: '/currency', icon: Calculator, label: 'Currency' },
   { path: '/news', icon: Newspaper, label: 'News' },
   { path: '/alerts', icon: Bell, label: 'Alerts' },
-  { path: '/assistant', icon: Bot, label: 'AI' },
 ];
 
 export function BottomNav() {
