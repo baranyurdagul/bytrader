@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Wallet, Bell, Newspaper, Calculator } from 'lucide-react';
+import { Home, Wallet, Bell, Calculator, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -7,15 +7,14 @@ interface NavItem {
   path: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  requiresAuth?: boolean;
 }
 
 const navItems: NavItem[] = [
   { path: '/', icon: Home, label: 'Markets' },
   { path: '/portfolio', icon: Wallet, label: 'Portfolio' },
   { path: '/currency', icon: Calculator, label: 'Currency' },
-  { path: '/news', icon: Newspaper, label: 'News' },
   { path: '/alerts', icon: Bell, label: 'Alerts' },
+  { path: '/profile', icon: User, label: 'Profile' },
 ];
 
 export function BottomNav() {
@@ -30,9 +29,9 @@ export function BottomNav() {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
             
-            // Show different icon/label for auth based on login status
-            const displayLabel = item.path === '/auth' 
-              ? (isAuthenticated ? 'Account' : 'Sign In')
+            // Show different label for profile based on login status
+            const displayLabel = item.path === '/profile' 
+              ? (isAuthenticated ? 'Profile' : 'Sign In')
               : item.label;
 
             return (
