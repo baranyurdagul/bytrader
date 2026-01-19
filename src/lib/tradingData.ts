@@ -15,6 +15,7 @@ export interface CommodityData {
   marketCap: string;
   priceHistory: PricePoint[];
   dataSource?: 'live' | 'simulated';
+  sourceProvider?: string; // e.g., "Yahoo Finance", "CoinGecko"
   // ETF-specific fields
   dividendYield?: number;
   expenseRatio?: number;
