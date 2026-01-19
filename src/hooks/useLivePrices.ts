@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CommodityData, PricePoint } from '@/lib/tradingData';
 import { useToast } from '@/hooks/use-toast';
@@ -7,7 +7,7 @@ interface LivePriceData {
   id: string;
   name: string;
   symbol: string;
-  category: 'metal' | 'crypto' | 'index';
+  category: 'metal' | 'crypto' | 'index' | 'etf';
   price: number;
   priceUnit: string;
   change: number;
@@ -17,28 +17,25 @@ interface LivePriceData {
   volume: string;
   marketCap: string;
   lastUpdated: string;
+  dataSource?: 'live' | 'simulated';
+  dividendYield?: number;
+  expenseRatio?: number;
 }
 
-// Cache for historical price data
-const historicalCache: Map<string, { data: PricePoint[], timestamp: number }> = new Map();
+// Cache for historical price data - persist across renders
+const historicalCache: Map<string, { data: PricePoint[], timestamp: number, dataSource: 'live' | 'simulated' }> = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Fetch real historical prices from edge function
-async function fetchHistoricalPrices(assetId: string, category: string, days: number = 365): Promise<PricePoint[]> {
+async function fetchHistoricalPrices(assetId: string, category: string, days: number = 365): Promise<{ data: PricePoint[], dataSource: 'live' | 'simulated' }> {
   const cacheKey = `${assetId}-${days}`;
   const cached = historicalCache.get(cacheKey);
   
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.data;
+    return { data: cached.data, dataSource: cached.dataSource };
   }
   
   try {
-    const { data, error } = await supabase.functions.invoke('fetch-historical-prices', {
-      body: {},
-      headers: {},
-    });
-    
-    // Use query params via URL approach since invoke doesn't support query params well
     const response = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-historical-prices?asset=${assetId}&category=${category}&days=${days}`,
       {
@@ -55,7 +52,7 @@ async function fetchHistoricalPrices(assetId: string, category: string, days: nu
     
     const result = await response.json();
     
-    if (result.success && result.data) {
+    if (result.success && result.data && result.data.length > 0) {
       const priceHistory: PricePoint[] = result.data.map((point: any) => ({
         timestamp: point.timestamp,
         open: point.open,
@@ -65,61 +62,22 @@ async function fetchHistoricalPrices(assetId: string, category: string, days: nu
         volume: point.volume,
       }));
       
-      historicalCache.set(cacheKey, { data: priceHistory, timestamp: Date.now() });
-      return priceHistory;
+      // Determine if data is from real API or generated
+      const dataSource: 'live' | 'simulated' = priceHistory.length > 10 ? 'live' : 'simulated';
+      
+      historicalCache.set(cacheKey, { data: priceHistory, timestamp: Date.now(), dataSource });
+      return { data: priceHistory, dataSource };
     }
     
-    throw new Error('Invalid response format');
+    throw new Error('Invalid response format or empty data');
   } catch (error) {
-    console.error(`Error fetching historical prices for ${assetId}:`, error);
-    // Return fallback generated data
-    return generateFallbackHistory(assetId, category, days);
+    console.warn(`Using cached/fallback history for ${assetId}:`, error);
+    // Return existing cache if available, even if expired
+    if (cached) {
+      return { data: cached.data, dataSource: cached.dataSource };
+    }
+    return { data: [], dataSource: 'simulated' };
   }
-}
-
-// Generate fallback history with realistic price ranges (based on actual 2024-2025 market data)
-function generateFallbackHistory(assetId: string, category: string, days: number): PricePoint[] {
-  const history: PricePoint[] = [];
-  const now = Date.now();
-  
-  // Realistic prices based on actual market data (2025-2026)
-  const configs: Record<string, { current: number; yearAgo: number; volatility: number }> = {
-    gold: { current: 4500, yearAgo: 2650, volatility: 0.008 },
-    silver: { current: 90, yearAgo: 31, volatility: 0.012 },
-    copper: { current: 5.50, yearAgo: 4.25, volatility: 0.015 },
-    bitcoin: { current: 95000, yearAgo: 45000, volatility: 0.04 },
-    ethereum: { current: 3300, yearAgo: 2500, volatility: 0.045 },
-    nasdaq100: { current: 21500, yearAgo: 17000, volatility: 0.015 },
-    sp500: { current: 5900, yearAgo: 5000, volatility: 0.012 },
-  };
-  
-  const config = configs[assetId] || { current: 100, yearAgo: 80, volatility: 0.02 };
-  
-  let currentPrice = config.yearAgo;
-  const dailyTrend = (config.current - config.yearAgo) / days;
-  
-  for (let i = days; i >= 0; i--) {
-    const timestamp = now - i * 24 * 60 * 60 * 1000;
-    const randomChange = (Math.random() - 0.5) * config.volatility * currentPrice;
-    
-    const open = currentPrice;
-    const close = i === 0 ? config.current : currentPrice + dailyTrend + randomChange;
-    const high = Math.max(open, close) * (1 + Math.random() * 0.015);
-    const low = Math.min(open, close) * (1 - Math.random() * 0.015);
-    
-    history.push({
-      timestamp,
-      open,
-      high,
-      low,
-      close: Math.max(close, 0.01),
-      volume: Math.floor(Math.random() * 1000000) + 500000,
-    });
-    
-    currentPrice = close;
-  }
-  
-  return history;
 }
 
 export function useLivePrices(refreshInterval: number = 60000) {
@@ -128,8 +86,14 @@ export function useLivePrices(refreshInterval: number = 60000) {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { toast } = useToast();
+  const hasShownToast = useRef(false);
+  const isFetching = useRef(false);
 
   const fetchPrices = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetching.current) return;
+    isFetching.current = true;
+    
     try {
       const { data, error: fetchError } = await supabase.functions.invoke('fetch-prices');
       
@@ -143,44 +107,60 @@ export function useLivePrices(refreshInterval: number = 60000) {
       
       const livePrices: LivePriceData[] = data.data;
       
-      // Convert to CommodityData format with generated price history
-      const commodityData: CommodityData[] = livePrices.map((item) => ({
-        id: item.id,
-        name: item.name,
-        symbol: item.symbol,
-        category: item.category,
-        price: item.price,
-        priceUnit: item.priceUnit,
-        change: item.change,
-        changePercent: item.changePercent,
-        high24h: item.high24h,
-        low24h: item.low24h,
-        volume: item.volume,
-        marketCap: item.marketCap,
-        priceHistory: generateFallbackHistory(item.id, item.category, 365),
-        dataSource: (item as any).dataSource || 'simulated',
-      }));
+      // Fetch historical data for all assets in parallel
+      const historicalPromises = livePrices.map(item => 
+        fetchHistoricalPrices(item.id, item.category)
+      );
+      
+      const historicalResults = await Promise.all(historicalPromises);
+      
+      // Convert to CommodityData format with real historical data
+      const commodityData: CommodityData[] = livePrices.map((item, index) => {
+        const histResult = historicalResults[index];
+        
+        return {
+          id: item.id,
+          name: item.name,
+          symbol: item.symbol,
+          category: item.category,
+          price: item.price,
+          priceUnit: item.priceUnit,
+          change: item.change,
+          changePercent: item.changePercent,
+          high24h: item.high24h,
+          low24h: item.low24h,
+          volume: item.volume,
+          marketCap: item.marketCap,
+          priceHistory: histResult.data,
+          dataSource: item.dataSource || histResult.dataSource,
+          dividendYield: item.dividendYield,
+          expenseRatio: item.expenseRatio,
+        };
+      });
       
       setCommodities(commodityData);
       setLastUpdated(new Date());
       setError(null);
+      hasShownToast.current = false;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch prices';
       console.error('Error fetching live prices:', errorMessage);
       setError(errorMessage);
       
-      // Only show toast on first error
-      if (!error) {
+      // Only show toast once per error session
+      if (!hasShownToast.current) {
+        hasShownToast.current = true;
         toast({
-          title: "Using simulated data",
-          description: "Live prices unavailable. Showing simulated data.",
+          title: "Using cached data",
+          description: "Live prices unavailable. Showing cached data.",
           variant: "default",
         });
       }
     } finally {
       setIsLoading(false);
+      isFetching.current = false;
     }
-  }, [error, toast]);
+  }, [toast]);
 
   useEffect(() => {
     // Initial fetch

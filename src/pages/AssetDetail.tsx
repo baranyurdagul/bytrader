@@ -179,7 +179,7 @@ const AssetDetail = () => {
                     isPositive ? "text-success bg-success/10" : "text-destructive bg-destructive/10"
                   )}>
                     {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    {isPositive ? '+' : ''}{selectedCommodity.change.toFixed(2)}%
+                    {isPositive ? '+' : ''}{selectedCommodity.changePercent.toFixed(2)}%
                   </span>
                 </div>
               </div>

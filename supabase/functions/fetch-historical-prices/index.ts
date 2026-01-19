@@ -264,12 +264,19 @@ Deno.serve(async (req) => {
       history = generateRealisticHistory(assetId, days, undefined, interval);
     }
     
-    console.log(`Returning ${history.length} price points`);
+    // Determine if data came from real API or was generated
+    const isLiveData = history.length > 0 && (
+      (category === 'crypto' && history.length > 50) ||
+      (category !== 'crypto' && history.length > 30)
+    );
+    
+    console.log(`Returning ${history.length} price points (${isLiveData ? 'live' : 'simulated'})`);
     
     return new Response(
       JSON.stringify({ 
         success: true, 
         data: history,
+        dataSource: isLiveData ? 'live' : 'simulated',
         asset: assetId,
         days,
         timestamp: new Date().toISOString()
