@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Wallet, Bell, Newspaper, User } from 'lucide-react';
+import { Home, Wallet, Bell, Newspaper, User, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -13,6 +13,7 @@ const navItems: NavItem[] = [
   { path: '/', icon: Home, label: 'Markets' },
   { path: '/portfolio', icon: Wallet, label: 'Portfolio' },
   { path: '/news', icon: Newspaper, label: 'News' },
+  { path: '/currency', icon: Calculator, label: 'Currency' },
   { path: '/alerts', icon: Bell, label: 'Alerts' },
   { path: '/profile', icon: User, label: 'Profile' },
 ];
@@ -39,7 +40,7 @@ export function BottomNav() {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 min-w-[60px]",
+                  "flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl transition-all duration-200 min-w-[50px]",
                   isActive
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
