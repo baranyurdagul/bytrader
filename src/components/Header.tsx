@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Bell, Settings, Coins, Wallet, User, LogOut, LogIn, RefreshCw } from 'lucide-react';
+import { Activity, Bell, Settings, Coins, Wallet, User, LogOut, LogIn, RefreshCw, Calculator } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
@@ -105,6 +105,18 @@ export function Header() {
               >
                 <Bell className="w-4 h-4" />
                 Alerts
+              </Link>
+              <Link
+                to="/currency"
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
+                  location.pathname === '/currency'
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                )}
+              >
+                <Calculator className="w-4 h-4" />
+                Currency
               </Link>
             </nav>
           </div>
