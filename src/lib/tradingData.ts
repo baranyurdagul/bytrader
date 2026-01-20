@@ -30,8 +30,11 @@ export function formatPrice(price: number, decimals: number = 2): string {
   });
 }
 
-export function formatChange(change: number): string {
+export function formatChange(change: number, changePercent?: number): string {
   const sign = change >= 0 ? '+' : '';
+  if (changePercent !== undefined) {
+    return `${sign}${change.toFixed(2)} (${sign}${changePercent.toFixed(2)}%)`;
+  }
   return `${sign}${change.toFixed(2)}`;
 }
 
