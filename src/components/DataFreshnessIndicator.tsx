@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 interface DataFreshnessIndicatorProps {
   lastUpdated: Date | null;
   historicalFetchedAt: Date | null;
-  dataSource: 'live' | 'simulated';
+  dataSource: 'live' | 'cached' | 'unavailable' | 'simulated';
   sourceProvider: string; // e.g., "Yahoo Finance", "CoinGecko"
   className?: string;
 }
@@ -30,7 +30,7 @@ export function DataFreshnessIndicator({
     return date.toLocaleDateString();
   };
 
-  const isLive = dataSource === 'live';
+  const isLive = dataSource === 'live' || dataSource === 'cached';
 
   return (
     <TooltipProvider>
