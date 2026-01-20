@@ -17,44 +17,32 @@ interface LivePriceData {
   volume: string;
   marketCap: string;
   lastUpdated: string;
-  dataSource?: 'live' | 'simulated';
+  dataSource?: 'live' | 'cached' | 'unavailable';
   dividendYield?: number;
   expenseRatio?: number;
 }
 
-// Cache for historical price data - persist across renders
-interface HistoricalCacheEntry {
-  data: PricePoint[];
+// Unified cache for all data - single source of truth
+interface CacheEntry {
+  prices: CommodityData[];
   timestamp: number;
-  dataSource: 'live' | 'simulated';
-  sourceProvider: string;
 }
-const historicalCache: Map<string, HistoricalCacheEntry> = new Map();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+let globalPriceCache: CacheEntry | null = null;
+const CACHE_DURATION = 60 * 1000; // 1 minute
 
 // Get source provider based on category
 function getSourceProvider(category: string): string {
   return category === 'crypto' ? 'CoinGecko' : 'Yahoo Finance';
 }
 
-// Fetch real historical prices from edge function
+// Fetch historical prices for a specific asset
 async function fetchHistoricalPrices(
   assetId: string, 
   category: string, 
   days: number = 365
-): Promise<{ data: PricePoint[], dataSource: 'live' | 'simulated', sourceProvider: string, fetchedAt: Date }> {
-  const cacheKey = `${assetId}-${days}`;
-  const cached = historicalCache.get(cacheKey);
+): Promise<{ data: PricePoint[], dataSource: 'live' | 'unavailable', sourceProvider: string }> {
   const sourceProvider = getSourceProvider(category);
-  
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return { 
-      data: cached.data, 
-      dataSource: cached.dataSource, 
-      sourceProvider: cached.sourceProvider,
-      fetchedAt: new Date(cached.timestamp)
-    };
-  }
   
   try {
     const response = await fetch(
@@ -83,39 +71,26 @@ async function fetchHistoricalPrices(
         volume: point.volume,
       }));
       
-      // Determine if data is from real API or generated
-      const dataSource: 'live' | 'simulated' = priceHistory.length > 10 ? 'live' : 'simulated';
-      const fetchedAt = new Date();
-      
-      historicalCache.set(cacheKey, { 
-        data: priceHistory, 
-        timestamp: fetchedAt.getTime(), 
-        dataSource,
-        sourceProvider 
-      });
-      return { data: priceHistory, dataSource, sourceProvider, fetchedAt };
-    }
-    
-    throw new Error('Invalid response format or empty data');
-  } catch (error) {
-    console.warn(`Using cached/fallback history for ${assetId}:`, error);
-    // Return existing cache if available, even if expired
-    if (cached) {
       return { 
-        data: cached.data, 
-        dataSource: cached.dataSource, 
-        sourceProvider: cached.sourceProvider,
-        fetchedAt: new Date(cached.timestamp)
+        data: priceHistory, 
+        dataSource: 'live', 
+        sourceProvider 
       };
     }
-    return { data: [], dataSource: 'simulated', sourceProvider, fetchedAt: new Date() };
+    
+    return { data: [], dataSource: 'unavailable', sourceProvider };
+  } catch (error) {
+    console.error(`Error fetching history for ${assetId}:`, error);
+    return { data: [], dataSource: 'unavailable', sourceProvider };
   }
 }
 
 export interface DataFreshnessInfo {
   lastPriceUpdate: Date | null;
   lastHistoricalFetch: Date | null;
-  sourceProviders: Map<string, string>; // assetId -> provider
+  sourceProviders: Map<string, string>;
+  hasStaleData: boolean;
+  hasMissingData: boolean;
 }
 
 export function useLivePrices(refreshInterval: number = 60000) {
@@ -127,6 +102,8 @@ export function useLivePrices(refreshInterval: number = 60000) {
     lastPriceUpdate: null,
     lastHistoricalFetch: null,
     sourceProviders: new Map(),
+    hasStaleData: false,
+    hasMissingData: false,
   });
   const { toast } = useToast();
   const hasShownToast = useRef(false);
@@ -138,14 +115,23 @@ export function useLivePrices(refreshInterval: number = 60000) {
     isFetching.current = true;
     
     try {
+      // Check global cache first
+      if (globalPriceCache && Date.now() - globalPriceCache.timestamp < CACHE_DURATION) {
+        setCommodities(globalPriceCache.prices);
+        setLastUpdated(new Date(globalPriceCache.timestamp));
+        setIsLoading(false);
+        isFetching.current = false;
+        return;
+      }
+
       const { data, error: fetchError } = await supabase.functions.invoke('fetch-prices');
       
       if (fetchError) {
         throw new Error(fetchError.message);
       }
       
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch prices');
+      if (!data.success || !data.data || data.data.length === 0) {
+        throw new Error(data.error || 'No price data available');
       }
       
       const livePrices: LivePriceData[] = data.data;
@@ -157,19 +143,29 @@ export function useLivePrices(refreshInterval: number = 60000) {
       
       const historicalResults = await Promise.all(historicalPromises);
       
-      // Build source providers map and track latest historical fetch time
+      // Build source providers map and track data quality
       const newSourceProviders = new Map<string, string>();
-      let latestHistFetch: Date | null = null;
+      let hasStaleData = false;
+      let hasMissingData = false;
       
       historicalResults.forEach((histResult, index) => {
         const assetId = livePrices[index].id;
         newSourceProviders.set(assetId, histResult.sourceProvider);
-        if (!latestHistFetch || histResult.fetchedAt > latestHistFetch) {
-          latestHistFetch = histResult.fetchedAt;
+        if (histResult.dataSource === 'unavailable') {
+          hasMissingData = true;
         }
       });
       
-      // Convert to CommodityData format with real historical data
+      // Check for stale/cached price data
+      livePrices.forEach(item => {
+        if (item.dataSource === 'cached') {
+          hasStaleData = true;
+        } else if (item.dataSource === 'unavailable') {
+          hasMissingData = true;
+        }
+      });
+      
+      // Convert to CommodityData format
       const commodityData: CommodityData[] = livePrices.map((item, index) => {
         const histResult = historicalResults[index];
         
@@ -187,7 +183,7 @@ export function useLivePrices(refreshInterval: number = 60000) {
           volume: item.volume,
           marketCap: item.marketCap,
           priceHistory: histResult.data,
-          dataSource: item.dataSource || histResult.dataSource,
+          dataSource: item.dataSource || 'live',
           sourceProvider: histResult.sourceProvider,
           dividendYield: item.dividendYield,
           expenseRatio: item.expenseRatio,
@@ -195,27 +191,51 @@ export function useLivePrices(refreshInterval: number = 60000) {
       });
       
       const now = new Date();
+      
+      // Update global cache
+      globalPriceCache = {
+        prices: commodityData,
+        timestamp: now.getTime(),
+      };
+      
       setCommodities(commodityData);
       setLastUpdated(now);
       setDataFreshness({
         lastPriceUpdate: now,
-        lastHistoricalFetch: latestHistFetch,
+        lastHistoricalFetch: now,
         sourceProviders: newSourceProviders,
+        hasStaleData,
+        hasMissingData,
       });
       setError(null);
       hasShownToast.current = false;
+      
+      // Show warning if data quality issues
+      if (hasMissingData && !hasShownToast.current) {
+        hasShownToast.current = true;
+        toast({
+          title: "Some data unavailable",
+          description: "Unable to fetch all price data. Some assets may show stale values.",
+          variant: "default",
+        });
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch prices';
       console.error('Error fetching live prices:', errorMessage);
       setError(errorMessage);
       
-      // Only show toast once per error session
+      // Use cached data if available
+      if (globalPriceCache) {
+        setCommodities(globalPriceCache.prices);
+        setDataFreshness(prev => ({ ...prev, hasStaleData: true }));
+      }
+      
       if (!hasShownToast.current) {
         hasShownToast.current = true;
         toast({
-          title: "Using cached data",
-          description: "Live prices unavailable. Showing cached data.",
-          variant: "default",
+          title: "Connection issue",
+          description: "Unable to fetch live prices. Showing cached data.",
+          variant: "destructive",
         });
       }
     } finally {
@@ -225,16 +245,16 @@ export function useLivePrices(refreshInterval: number = 60000) {
   }, [toast]);
 
   useEffect(() => {
-    // Initial fetch
     fetchPrices();
     
-    // Set up interval for periodic updates
     const intervalId = setInterval(fetchPrices, refreshInterval);
     
     return () => clearInterval(intervalId);
   }, [fetchPrices, refreshInterval]);
 
   const refetch = useCallback(() => {
+    // Clear cache to force fresh fetch
+    globalPriceCache = null;
     setIsLoading(true);
     fetchPrices();
   }, [fetchPrices]);

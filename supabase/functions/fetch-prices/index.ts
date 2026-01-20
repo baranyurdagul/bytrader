@@ -17,11 +17,15 @@ interface PriceData {
   volume: string;
   marketCap: string;
   lastUpdated: string;
-  dataSource: 'live' | 'simulated';
+  dataSource: 'live' | 'cached' | 'unavailable';
   // ETF-specific fields
   dividendYield?: number;
   expenseRatio?: number;
 }
+
+// In-memory cache for last known good prices (no random generation)
+const priceCache: Map<string, PriceData> = new Map();
+const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes before marking as stale
 
 // Yahoo Finance tickers for commodities, indices, and ETFs
 const YAHOO_TICKERS = {
@@ -88,10 +92,11 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
   ]);
   
   const results: PriceData[] = [];
+  const now = new Date().toISOString();
   
   if (goldQuote?.price) {
     const change = goldQuote.price - (goldQuote.previousClose || goldQuote.price);
-    results.push({
+    const priceData: PriceData = {
       id: 'gold',
       name: 'Gold',
       symbol: 'XAU/USD',
@@ -104,14 +109,22 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
       low24h: goldQuote.low || goldQuote.price,
       volume: formatVolume(goldQuote.volume || 125000),
       marketCap: '$15.8T',
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: now,
       dataSource: 'live',
-    });
+    };
+    results.push(priceData);
+    priceCache.set('gold', { ...priceData, lastUpdated: now });
+  } else {
+    // Use cached data if available, no random generation
+    const cached = priceCache.get('gold');
+    if (cached) {
+      results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
+    }
   }
   
   if (silverQuote?.price) {
     const change = silverQuote.price - (silverQuote.previousClose || silverQuote.price);
-    results.push({
+    const priceData: PriceData = {
       id: 'silver',
       name: 'Silver',
       symbol: 'XAG/USD',
@@ -124,21 +137,17 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
       low24h: silverQuote.low || silverQuote.price,
       volume: formatVolume(silverQuote.volume || 89000),
       marketCap: '$1.4T',
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: now,
       dataSource: 'live',
-    });
+    };
+    results.push(priceData);
+    priceCache.set('silver', { ...priceData, lastUpdated: now });
+  } else {
+    const cached = priceCache.get('silver');
+    if (cached) {
+      results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
+    }
   }
-  
-  // If Yahoo Finance failed, use fallback
-  if (results.length === 0) {
-    console.log('Yahoo Finance failed for metals, using fallback');
-    return getMetalFallbackData();
-  }
-  
-  // Fill in any missing metals with fallback
-  const fallback = getMetalFallbackData();
-  if (!results.find(r => r.id === 'gold')) results.push(fallback.find(f => f.id === 'gold')!);
-  if (!results.find(r => r.id === 'silver')) results.push(fallback.find(f => f.id === 'silver')!);
   
   console.log(`Fetched ${results.filter(r => r.dataSource === 'live').length} live metal prices`);
   return results;
@@ -156,6 +165,7 @@ async function fetchETFPrices(): Promise<PriceData[]> {
   ]);
   
   const results: PriceData[] = [];
+  const now = new Date().toISOString();
   
   const etfConfigs = [
     { quote: vymQuote, id: 'vym', name: 'Vanguard High Dividend Yield', symbol: 'VYM', marketCap: '$56B', dividendYield: 2.85, expenseRatio: 0.06 },
@@ -167,7 +177,7 @@ async function fetchETFPrices(): Promise<PriceData[]> {
   for (const config of etfConfigs) {
     if (config.quote?.price) {
       const change = config.quote.price - (config.quote.previousClose || config.quote.price);
-      results.push({
+      const priceData: PriceData = {
         id: config.id,
         name: config.name,
         symbol: config.symbol,
@@ -180,25 +190,18 @@ async function fetchETFPrices(): Promise<PriceData[]> {
         low24h: config.quote.low || config.quote.price,
         volume: formatVolume(config.quote.volume || 1000000),
         marketCap: config.marketCap,
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: now,
         dataSource: 'live',
         dividendYield: config.dividendYield,
         expenseRatio: config.expenseRatio,
-      });
-    }
-  }
-  
-  // If Yahoo Finance failed, use fallback
-  if (results.length === 0) {
-    console.log('Yahoo Finance failed for ETFs, using fallback');
-    return getETFFallbackData();
-  }
-  
-  // Fill in any missing ETFs with fallback
-  const fallback = getETFFallbackData();
-  for (const fb of fallback) {
-    if (!results.find(r => r.id === fb.id)) {
-      results.push(fb);
+      };
+      results.push(priceData);
+      priceCache.set(config.id, { ...priceData, lastUpdated: now });
+    } else {
+      const cached = priceCache.get(config.id);
+      if (cached) {
+        results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
+      }
     }
   }
   
@@ -208,6 +211,8 @@ async function fetchETFPrices(): Promise<PriceData[]> {
 
 // Fetch crypto prices from CoinGecko (free, no API key needed)
 async function fetchCryptoPrices(): Promise<PriceData[]> {
+  const now = new Date().toISOString();
+  
   try {
     const response = await fetch(
       'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum&order=market_cap_desc&sparkline=false&price_change_percentage=24h'
@@ -215,31 +220,47 @@ async function fetchCryptoPrices(): Promise<PriceData[]> {
     
     if (!response.ok) {
       console.error('CoinGecko API error:', response.status);
-      return getCryptoFallbackData();
+      // Return cached data
+      return getCachedCryptos(now);
     }
     
     const data = await response.json();
     
-    return data.map((coin: any) => ({
-      id: coin.id,
-      name: coin.name,
-      symbol: coin.symbol.toUpperCase() + '/USD',
-      category: 'crypto' as const,
-      price: coin.current_price,
-      priceUnit: '',
-      change: coin.price_change_24h || 0,
-      changePercent: coin.price_change_percentage_24h || 0,
-      high24h: coin.high_24h || coin.current_price,
-      low24h: coin.low_24h || coin.current_price,
-      volume: formatVolume(coin.total_volume),
-      marketCap: formatMarketCap(coin.market_cap),
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'live' as const,
-    }));
+    const results = data.map((coin: any) => {
+      const priceData: PriceData = {
+        id: coin.id,
+        name: coin.name,
+        symbol: coin.symbol.toUpperCase() + '/USD',
+        category: 'crypto' as const,
+        price: coin.current_price,
+        priceUnit: '',
+        change: coin.price_change_24h || 0,
+        changePercent: coin.price_change_percentage_24h || 0,
+        high24h: coin.high_24h || coin.current_price,
+        low24h: coin.low_24h || coin.current_price,
+        volume: formatVolume(coin.total_volume),
+        marketCap: formatMarketCap(coin.market_cap),
+        lastUpdated: now,
+        dataSource: 'live' as const,
+      };
+      priceCache.set(coin.id, { ...priceData, lastUpdated: now });
+      return priceData;
+    });
+    
+    return results;
   } catch (error) {
     console.error('Error fetching crypto prices:', error);
-    return getCryptoFallbackData();
+    return getCachedCryptos(now);
   }
+}
+
+function getCachedCryptos(now: string): PriceData[] {
+  const results: PriceData[] = [];
+  const btc = priceCache.get('bitcoin');
+  const eth = priceCache.get('ethereum');
+  if (btc) results.push({ ...btc, dataSource: 'cached', lastUpdated: now });
+  if (eth) results.push({ ...eth, dataSource: 'cached', lastUpdated: now });
+  return results;
 }
 
 // Fetch indices from Yahoo Finance
@@ -252,10 +273,11 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
   ]);
   
   const results: PriceData[] = [];
+  const now = new Date().toISOString();
   
   if (nasdaqQuote?.price) {
     const change = nasdaqQuote.price - (nasdaqQuote.previousClose || nasdaqQuote.price);
-    results.push({
+    const priceData: PriceData = {
       id: 'nasdaq100',
       name: 'Nasdaq 100',
       symbol: 'NDX',
@@ -268,14 +290,21 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
       low24h: nasdaqQuote.low || nasdaqQuote.price,
       volume: formatVolume(nasdaqQuote.volume || 4200000000),
       marketCap: '$25T',
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: now,
       dataSource: 'live',
-    });
+    };
+    results.push(priceData);
+    priceCache.set('nasdaq100', { ...priceData, lastUpdated: now });
+  } else {
+    const cached = priceCache.get('nasdaq100');
+    if (cached) {
+      results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
+    }
   }
   
   if (sp500Quote?.price) {
     const change = sp500Quote.price - (sp500Quote.previousClose || sp500Quote.price);
-    results.push({
+    const priceData: PriceData = {
       id: 'sp500',
       name: 'S&P 500',
       symbol: 'SPX',
@@ -288,227 +317,20 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
       low24h: sp500Quote.low || sp500Quote.price,
       volume: formatVolume(sp500Quote.volume || 3800000000),
       marketCap: '$42T',
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: now,
       dataSource: 'live',
-    });
+    };
+    results.push(priceData);
+    priceCache.set('sp500', { ...priceData, lastUpdated: now });
+  } else {
+    const cached = priceCache.get('sp500');
+    if (cached) {
+      results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
+    }
   }
-  
-  if (results.length === 0) {
-    console.log('Yahoo Finance failed for indices, using fallback');
-    return getIndicesFallbackData();
-  }
-  
-  // Fill in missing indices
-  const fallback = getIndicesFallbackData();
-  if (!results.find(r => r.id === 'nasdaq100')) results.push(fallback.find(f => f.id === 'nasdaq100')!);
-  if (!results.find(r => r.id === 'sp500')) results.push(fallback.find(f => f.id === 'sp500')!);
   
   console.log(`Fetched ${results.filter(r => r.dataSource === 'live').length} live index prices`);
   return results;
-}
-
-// Fallback prices (used when Yahoo Finance is unavailable)
-// Current prices as of Jan 2026
-function getMetalFallbackData(): PriceData[] {
-  const goldBase = 4500 + (Math.random() - 0.5) * 50;
-  const silverBase = 90 + (Math.random() - 0.5) * 3;
-  
-  return [
-    {
-      id: 'gold',
-      name: 'Gold',
-      symbol: 'XAU/USD',
-      category: 'metal',
-      price: goldBase,
-      priceUnit: '/oz',
-      change: (Math.random() - 0.5) * 40,
-      changePercent: (Math.random() - 0.5) * 1,
-      high24h: goldBase * 1.005,
-      low24h: goldBase * 0.995,
-      volume: '125.4K',
-      marketCap: '$15.8T',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-    },
-    {
-      id: 'silver',
-      name: 'Silver',
-      symbol: 'XAG/USD',
-      category: 'metal',
-      price: silverBase,
-      priceUnit: '/oz',
-      change: (Math.random() - 0.5) * 2,
-      changePercent: (Math.random() - 0.5) * 2,
-      high24h: silverBase * 1.008,
-      low24h: silverBase * 0.992,
-      volume: '89.2K',
-      marketCap: '$1.4T',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-    },
-  ];
-}
-
-function getETFFallbackData(): PriceData[] {
-  const vymBase = 125 + (Math.random() - 0.5) * 2;
-  const vymiBase = 72 + (Math.random() - 0.5) * 1.5;
-  const gldmBase = 58 + (Math.random() - 0.5) * 1;
-  const slvBase = 28 + (Math.random() - 0.5) * 0.5;
-  
-  return [
-    {
-      id: 'vym',
-      name: 'Vanguard High Dividend Yield',
-      symbol: 'VYM',
-      category: 'etf',
-      price: vymBase,
-      priceUnit: '',
-      change: (Math.random() - 0.5) * 1.5,
-      changePercent: (Math.random() - 0.5) * 1.2,
-      high24h: vymBase * 1.005,
-      low24h: vymBase * 0.995,
-      volume: '2.1M',
-      marketCap: '$56B',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-      dividendYield: 2.85,
-      expenseRatio: 0.06,
-    },
-    {
-      id: 'vymi',
-      name: 'Vanguard Intl High Dividend',
-      symbol: 'VYMI',
-      category: 'etf',
-      price: vymiBase,
-      priceUnit: '',
-      change: (Math.random() - 0.5) * 1,
-      changePercent: (Math.random() - 0.5) * 1.4,
-      high24h: vymiBase * 1.006,
-      low24h: vymiBase * 0.994,
-      volume: '450K',
-      marketCap: '$8.5B',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-      dividendYield: 4.52,
-      expenseRatio: 0.22,
-    },
-    {
-      id: 'gldm',
-      name: 'SPDR Gold MiniShares',
-      symbol: 'GLDM',
-      category: 'etf',
-      price: gldmBase,
-      priceUnit: '',
-      change: (Math.random() - 0.5) * 0.8,
-      changePercent: (Math.random() - 0.5) * 1.3,
-      high24h: gldmBase * 1.004,
-      low24h: gldmBase * 0.996,
-      volume: '3.5M',
-      marketCap: '$9.2B',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-      dividendYield: 0,
-      expenseRatio: 0.10,
-    },
-    {
-      id: 'slv',
-      name: 'iShares Silver Trust',
-      symbol: 'SLV',
-      category: 'etf',
-      price: slvBase,
-      priceUnit: '',
-      change: (Math.random() - 0.5) * 0.6,
-      changePercent: (Math.random() - 0.5) * 2,
-      high24h: slvBase * 1.008,
-      low24h: slvBase * 0.992,
-      volume: '12.5M',
-      marketCap: '$11.5B',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-      dividendYield: 0,
-      expenseRatio: 0.50,
-    },
-  ];
-}
-
-function getCryptoFallbackData(): PriceData[] {
-  const btcBase = 95000 + (Math.random() - 0.5) * 2000;
-  const ethBase = 3300 + (Math.random() - 0.5) * 100;
-  
-  return [
-    {
-      id: 'bitcoin',
-      name: 'Bitcoin',
-      symbol: 'BTC/USD',
-      category: 'crypto',
-      price: btcBase,
-      priceUnit: '',
-      change: (Math.random() - 0.5) * 1000,
-      changePercent: (Math.random() - 0.5) * 3,
-      high24h: btcBase * 1.02,
-      low24h: btcBase * 0.98,
-      volume: '27.8B',
-      marketCap: '$1.9T',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-    },
-    {
-      id: 'ethereum',
-      name: 'Ethereum',
-      symbol: 'ETH/USD',
-      category: 'crypto',
-      price: ethBase,
-      priceUnit: '',
-      change: (Math.random() - 0.5) * 50,
-      changePercent: (Math.random() - 0.5) * 3,
-      high24h: ethBase * 1.02,
-      low24h: ethBase * 0.98,
-      volume: '19.4B',
-      marketCap: '$398B',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-    },
-  ];
-}
-
-function getIndicesFallbackData(): PriceData[] {
-  const nasdaqBase = 21500 + (Math.random() - 0.5) * 200;
-  const spBase = 5900 + (Math.random() - 0.5) * 50;
-  
-  return [
-    {
-      id: 'nasdaq100',
-      name: 'Nasdaq 100',
-      symbol: 'NDX',
-      category: 'index',
-      price: nasdaqBase,
-      priceUnit: '',
-      change: (Math.random() - 0.5) * 100,
-      changePercent: (Math.random() - 0.5) * 1,
-      high24h: nasdaqBase * 1.005,
-      low24h: nasdaqBase * 0.995,
-      volume: '4.2B',
-      marketCap: '$25T',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-    },
-    {
-      id: 'sp500',
-      name: 'S&P 500',
-      symbol: 'SPX',
-      category: 'index',
-      price: spBase,
-      priceUnit: '',
-      change: (Math.random() - 0.5) * 30,
-      changePercent: (Math.random() - 0.5) * 0.8,
-      high24h: spBase * 1.004,
-      low24h: spBase * 0.996,
-      volume: '3.8B',
-      marketCap: '$42T',
-      lastUpdated: new Date().toISOString(),
-      dataSource: 'simulated',
-    },
-  ];
 }
 
 function formatVolume(volume: number): string {
@@ -518,14 +340,15 @@ function formatVolume(volume: number): string {
   return volume.toString();
 }
 
-function formatMarketCap(cap: number): string {
-  if (cap >= 1e12) return `$${(cap / 1e12).toFixed(1)}T`;
-  if (cap >= 1e9) return `$${(cap / 1e9).toFixed(0)}B`;
-  if (cap >= 1e6) return `$${(cap / 1e6).toFixed(0)}M`;
-  return `$${cap}`;
+function formatMarketCap(marketCap: number): string {
+  if (marketCap >= 1e12) return `$${(marketCap / 1e12).toFixed(1)}T`;
+  if (marketCap >= 1e9) return `$${(marketCap / 1e9).toFixed(0)}B`;
+  if (marketCap >= 1e6) return `$${(marketCap / 1e6).toFixed(0)}M`;
+  return `$${marketCap}`;
 }
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -533,25 +356,45 @@ Deno.serve(async (req) => {
   try {
     console.log('Fetching live prices from Yahoo Finance + CoinGecko...');
     
-    // Fetch from all sources in parallel
-    const [metalPrices, cryptoPrices, indicesPrices, etfPrices] = await Promise.all([
+    // Fetch all prices in parallel
+    const [metals, etfs, cryptos, indices] = await Promise.all([
       fetchMetalPrices(),
+      fetchETFPrices(),
       fetchCryptoPrices(),
       fetchIndicesPrices(),
-      fetchETFPrices(),
     ]);
     
-    // Combine all prices
-    const allPrices = [...metalPrices, ...cryptoPrices, ...indicesPrices, ...etfPrices];
+    const allPrices = [...metals, ...cryptos, ...indices, ...etfs];
     
     const liveCount = allPrices.filter(p => p.dataSource === 'live').length;
-    console.log(`Fetched ${allPrices.length} prices (${liveCount} live, ${allPrices.length - liveCount} simulated)`);
+    const cachedCount = allPrices.filter(p => p.dataSource === 'cached').length;
+    
+    console.log(`Fetched ${allPrices.length} prices (${liveCount} live, ${cachedCount} cached)`);
+    
+    // If no data at all, return an error
+    if (allPrices.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Unable to fetch any price data. Please try again later.',
+          data: []
+        }),
+        { 
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
     
     return new Response(
       JSON.stringify({ 
         success: true, 
         data: allPrices,
-        timestamp: new Date().toISOString()
+        meta: {
+          liveCount,
+          cachedCount,
+          timestamp: new Date().toISOString()
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -560,9 +403,13 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error instanceof Error ? error.message : 'Failed to fetch prices'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        data: []
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

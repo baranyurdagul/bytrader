@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { PricePoint } from '@/lib/tradingData';
 
 interface UseHistoricalPricesOptions {
@@ -12,45 +12,13 @@ interface UseHistoricalPricesResult {
   priceHistory: PricePoint[];
   isLoading: boolean;
   error: string | null;
+  dataSource: 'live' | 'unavailable';
   refetch: () => void;
 }
 
-// Cache for historical price data
-const historicalCache: Map<string, { data: PricePoint[], timestamp: number }> = new Map();
-const CACHE_DURATION = 60 * 1000; // 1 minute for more frequent updates
-
-// Generate fallback hourly history
-function generateHourlyFallback(assetId: string, currentPrice: number): PricePoint[] {
-  const history: PricePoint[] = [];
-  const now = Date.now();
-  const volatility = assetId === 'bitcoin' || assetId === 'ethereum' ? 0.015 : 0.003;
-  
-  let price = currentPrice * (1 - volatility * 2);
-  const trend = (currentPrice - price) / 24;
-  
-  for (let i = 24; i >= 0; i--) {
-    const timestamp = now - i * 60 * 60 * 1000;
-    const randomChange = (Math.random() - 0.5) * volatility * price;
-    
-    const open = price;
-    const close = i === 0 ? currentPrice : price + trend + randomChange;
-    const high = Math.max(open, close) * (1 + Math.random() * 0.002);
-    const low = Math.min(open, close) * (1 - Math.random() * 0.002);
-    
-    history.push({
-      timestamp,
-      open,
-      high,
-      low,
-      close: Math.max(close, 0.01),
-      volume: Math.floor(Math.random() * 100000) + 50000,
-    });
-    
-    price = close;
-  }
-  
-  return history;
-}
+// Unified cache - shared with useLivePrices conceptually
+const historicalCache: Map<string, { data: PricePoint[], timestamp: number, dataSource: 'live' | 'unavailable' }> = new Map();
+const CACHE_DURATION = 60 * 1000; // 1 minute - same as useLivePrices
 
 export function useHistoricalPrices({ 
   assetId, 
@@ -61,14 +29,22 @@ export function useHistoricalPrices({
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<'live' | 'unavailable'>('live');
+  const isFetching = useRef(false);
 
   const fetchData = useCallback(async () => {
+    if (isFetching.current) return;
+    isFetching.current = true;
+
     const cacheKey = `${assetId}-${days}-${interval}`;
     const cached = historicalCache.get(cacheKey);
     
+    // Use cache if valid
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       setPriceHistory(cached.data);
+      setDataSource(cached.dataSource);
       setIsLoading(false);
+      isFetching.current = false;
       return;
     }
 
@@ -92,7 +68,7 @@ export function useHistoricalPrices({
 
       const result = await response.json();
 
-      if (result.success && result.data) {
+      if (result.success && result.data && result.data.length > 0) {
         const history: PricePoint[] = result.data.map((point: any) => ({
           timestamp: point.timestamp,
           open: point.open,
@@ -102,22 +78,42 @@ export function useHistoricalPrices({
           volume: point.volume,
         }));
 
-        historicalCache.set(cacheKey, { data: history, timestamp: Date.now() });
+        const source: 'live' | 'unavailable' = result.dataSource === 'live' ? 'live' : 'unavailable';
+        
+        historicalCache.set(cacheKey, { 
+          data: history, 
+          timestamp: Date.now(),
+          dataSource: source
+        });
+        
         setPriceHistory(history);
+        setDataSource(source);
       } else {
-        throw new Error(result.error || 'Invalid response');
+        // No data available - use cached if exists
+        if (cached) {
+          setPriceHistory(cached.data);
+          setDataSource('unavailable');
+        } else {
+          setPriceHistory([]);
+          setDataSource('unavailable');
+        }
+        setError('No data available');
       }
     } catch (err) {
       console.error(`Error fetching historical prices for ${assetId}:`, err);
       setError(err instanceof Error ? err.message : 'Failed to fetch');
       
-      // Use fallback data
-      if (interval === '1h') {
-        const fallback = generateHourlyFallback(assetId, 100);
-        setPriceHistory(fallback);
+      // Use stale cache if available
+      if (cached) {
+        setPriceHistory(cached.data);
+        setDataSource('unavailable');
+      } else {
+        setPriceHistory([]);
+        setDataSource('unavailable');
       }
     } finally {
       setIsLoading(false);
+      isFetching.current = false;
     }
   }, [assetId, category, days, interval]);
 
@@ -125,10 +121,17 @@ export function useHistoricalPrices({
     fetchData();
   }, [fetchData]);
 
+  const refetch = useCallback(() => {
+    const cacheKey = `${assetId}-${days}-${interval}`;
+    historicalCache.delete(cacheKey);
+    fetchData();
+  }, [assetId, days, interval, fetchData]);
+
   return {
     priceHistory,
     isLoading,
     error,
-    refetch: fetchData,
+    dataSource,
+    refetch,
   };
 }

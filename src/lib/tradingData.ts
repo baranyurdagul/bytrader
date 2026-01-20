@@ -1,4 +1,6 @@
 // Trading data and technical analysis algorithms
+// NOTE: All price data should come from the backend API, not this file
+// This file only contains types, technical analysis algorithms, and utilities
 
 export interface CommodityData {
   id: string;
@@ -14,11 +16,43 @@ export interface CommodityData {
   volume: string;
   marketCap: string;
   priceHistory: PricePoint[];
-  dataSource?: 'live' | 'simulated';
-  sourceProvider?: string; // e.g., "Yahoo Finance", "CoinGecko"
-  // ETF-specific fields
+  dataSource?: 'live' | 'cached' | 'unavailable' | 'simulated';
+  sourceProvider?: string;
   dividendYield?: number;
   expenseRatio?: number;
+}
+
+// Utility functions for formatting
+export function formatPrice(price: number, decimals: number = 2): string {
+  return price.toLocaleString('en-US', { 
+    minimumFractionDigits: decimals, 
+    maximumFractionDigits: decimals 
+  });
+}
+
+export function formatChange(change: number): string {
+  const sign = change >= 0 ? '+' : '';
+  return `${sign}${change.toFixed(2)}`;
+}
+
+export function getCategoryIcon(category: string): string {
+  switch (category) {
+    case 'metal': return '🏆';
+    case 'crypto': return '₿';
+    case 'index': return '📊';
+    case 'etf': return '📈';
+    default: return '📊';
+  }
+}
+
+export function getCategoryLabel(category: string): string {
+  switch (category) {
+    case 'metal': return 'Metal';
+    case 'crypto': return 'Cryptocurrency';
+    case 'index': return 'Index';
+    case 'etf': return 'ETF';
+    default: return category;
+  }
 }
 
 export interface PricePoint {
@@ -69,7 +103,7 @@ export interface Signal {
 
 export interface TrendAnalysis {
   direction: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
-  strength: number; // 0-100
+  strength: number;
   support: number;
   resistance: number;
   pivotPoints: {
@@ -81,28 +115,6 @@ export interface TrendAnalysis {
     s2: number;
     s3: number;
   };
-}
-
-// Generate realistic price history
-function generatePriceHistory(basePrice: number, volatility: number, days: number = 30): PricePoint[] {
-  const history: PricePoint[] = [];
-  let currentPrice = basePrice * (0.95 + Math.random() * 0.1);
-  const now = Date.now();
-  
-  for (let i = days; i >= 0; i--) {
-    const timestamp = now - i * 24 * 60 * 60 * 1000;
-    const dailyChange = (Math.random() - 0.5) * volatility * currentPrice;
-    const open = currentPrice;
-    const close = currentPrice + dailyChange;
-    const high = Math.max(open, close) * (1 + Math.random() * 0.02);
-    const low = Math.min(open, close) * (1 - Math.random() * 0.02);
-    const volume = Math.floor(Math.random() * 1000000) + 500000;
-    
-    history.push({ timestamp, open, high, low, close, volume });
-    currentPrice = close;
-  }
-  
-  return history;
 }
 
 // Calculate RSI (Relative Strength Index)
@@ -128,14 +140,14 @@ function calculateRSI(prices: number[], period: number = 14): number {
 
 // Calculate SMA (Simple Moving Average)
 function calculateSMA(prices: number[], period: number): number {
-  if (prices.length < period) return prices[prices.length - 1];
+  if (prices.length < period) return prices[prices.length - 1] || 0;
   const slice = prices.slice(-period);
   return slice.reduce((a, b) => a + b, 0) / period;
 }
 
 // Calculate EMA (Exponential Moving Average)
 function calculateEMA(prices: number[], period: number): number {
-  if (prices.length < period) return prices[prices.length - 1];
+  if (prices.length < period) return prices[prices.length - 1] || 0;
   const multiplier = 2 / (period + 1);
   let ema = calculateSMA(prices.slice(0, period), period);
   
@@ -148,6 +160,10 @@ function calculateEMA(prices: number[], period: number): number {
 
 // Calculate MACD
 function calculateMACD(prices: number[]): { value: number; signal: number; histogram: number } {
+  if (prices.length < 26) {
+    return { value: 0, signal: 0, histogram: 0 };
+  }
+  
   const ema12 = calculateEMA(prices, 12);
   const ema26 = calculateEMA(prices, 26);
   const macdValue = ema12 - ema26;
@@ -157,7 +173,7 @@ function calculateMACD(prices: number[]): { value: number; signal: number; histo
     const slice = prices.slice(0, i);
     macdHistory.push(calculateEMA(slice, 12) - calculateEMA(slice, 26));
   }
-  const signal = calculateEMA(macdHistory, 9);
+  const signal = macdHistory.length >= 9 ? calculateEMA(macdHistory, 9) : macdValue;
   
   return {
     value: macdValue,
@@ -168,6 +184,11 @@ function calculateMACD(prices: number[]): { value: number; signal: number; histo
 
 // Calculate Bollinger Bands
 function calculateBollingerBands(prices: number[], period: number = 20): { upper: number; middle: number; lower: number } {
+  if (prices.length < period) {
+    const price = prices[prices.length - 1] || 0;
+    return { upper: price, middle: price, lower: price };
+  }
+  
   const sma = calculateSMA(prices, period);
   const slice = prices.slice(-period);
   const squaredDiffs = slice.map(p => Math.pow(p - sma, 2));
@@ -220,6 +241,8 @@ function calculateStochastic(priceHistory: PricePoint[], period: number = 14): {
 
 // Calculate ATR (Average True Range)
 function calculateATR(priceHistory: PricePoint[], period: number = 14): number {
+  if (priceHistory.length < 2) return 0;
+  
   const trueRanges = [];
   
   for (let i = 1; i < priceHistory.length; i++) {
@@ -233,11 +256,14 @@ function calculateATR(priceHistory: PricePoint[], period: number = 14): number {
     trueRanges.push(tr);
   }
   
-  return trueRanges.slice(-period).reduce((a, b) => a + b, 0) / period;
+  const slice = trueRanges.slice(-period);
+  return slice.length > 0 ? slice.reduce((a, b) => a + b, 0) / slice.length : 0;
 }
 
 // Calculate ADX (Average Directional Index)
 function calculateADX(priceHistory: PricePoint[], period: number = 14): number {
+  if (priceHistory.length < 2) return 0;
+  
   const changes = [];
   for (let i = 1; i < priceHistory.length; i++) {
     const current = priceHistory[i];
@@ -245,7 +271,8 @@ function calculateADX(priceHistory: PricePoint[], period: number = 14): number {
     changes.push(Math.abs(current.close - previous.close) / previous.close);
   }
   
-  const avgChange = changes.slice(-period).reduce((a, b) => a + b, 0) / period;
+  const slice = changes.slice(-period);
+  const avgChange = slice.length > 0 ? slice.reduce((a, b) => a + b, 0) / slice.length : 0;
   return Math.min(100, avgChange * 1000);
 }
 
@@ -375,8 +402,26 @@ function generateSignal(indicators: TechnicalIndicators, currentPrice: number, a
 
 // Calculate trend analysis
 function calculateTrendAnalysis(priceHistory: PricePoint[], currentPrice: number): TrendAnalysis {
+  if (!priceHistory || priceHistory.length === 0) {
+    return {
+      direction: 'NEUTRAL',
+      strength: 50,
+      support: currentPrice * 0.95,
+      resistance: currentPrice * 1.05,
+      pivotPoints: {
+        pp: currentPrice,
+        r1: currentPrice * 1.02,
+        r2: currentPrice * 1.04,
+        r3: currentPrice * 1.06,
+        s1: currentPrice * 0.98,
+        s2: currentPrice * 0.96,
+        s3: currentPrice * 0.94,
+      },
+    };
+  }
+
   const closes = priceHistory.map(p => p.close);
-  const sma20 = calculateSMA(closes, 20);
+  const sma20 = calculateSMA(closes, Math.min(20, closes.length));
   const sma50 = calculateSMA(closes, Math.min(50, closes.length));
   
   const recentPrices = priceHistory.slice(-20);
@@ -421,214 +466,9 @@ function calculateTrendAnalysis(priceHistory: PricePoint[], currentPrice: number
   };
 }
 
-// Main function to get all asset data
-// Prices updated for Jan 2026
-export function getCommodityData(): CommodityData[] {
-  // Metals (prices per troy ounce) - Jan 2026
-  const goldHistory = generatePriceHistory(4500, 0.015);
-  const silverHistory = generatePriceHistory(90, 0.025);
-  
-  // Crypto
-  const bitcoinHistory = generatePriceHistory(95000, 0.04);
-  const ethereumHistory = generatePriceHistory(3400, 0.045);
-  
-  // Indices
-  const nasdaqHistory = generatePriceHistory(21500, 0.018);
-  const sp500History = generatePriceHistory(5900, 0.012);
-  
-  // ETFs
-  const vymHistory = generatePriceHistory(125, 0.01);
-  const vymiHistory = generatePriceHistory(72, 0.012);
-  const gldmHistory = generatePriceHistory(58, 0.008);
-  const slvHistory = generatePriceHistory(28, 0.015);
-  
-  const getLastPrices = (history: PricePoint[]) => ({
-    current: history[history.length - 1].close,
-    previous: history[history.length - 2].close,
-    high: history[history.length - 1].high,
-    low: history[history.length - 1].low
-  });
-  
-  const gold = getLastPrices(goldHistory);
-  const silver = getLastPrices(silverHistory);
-  const bitcoin = getLastPrices(bitcoinHistory);
-  const ethereum = getLastPrices(ethereumHistory);
-  const nasdaq = getLastPrices(nasdaqHistory);
-  const sp500 = getLastPrices(sp500History);
-  const vym = getLastPrices(vymHistory);
-  const vymi = getLastPrices(vymiHistory);
-  const gldm = getLastPrices(gldmHistory);
-  const slv = getLastPrices(slvHistory);
-  
-  return [
-    // Metals
-    {
-      id: 'gold',
-      name: 'Gold',
-      symbol: 'XAU/USD',
-      category: 'metal',
-      price: gold.current,
-      priceUnit: '/oz',
-      change: gold.current - gold.previous,
-      changePercent: ((gold.current - gold.previous) / gold.previous) * 100,
-      high24h: gold.high,
-      low24h: gold.low,
-      volume: '125.4K',
-      marketCap: '$12.5T',
-      priceHistory: goldHistory
-    },
-    {
-      id: 'silver',
-      name: 'Silver',
-      symbol: 'XAG/USD',
-      category: 'metal',
-      price: silver.current,
-      priceUnit: '/oz',
-      change: silver.current - silver.previous,
-      changePercent: ((silver.current - silver.previous) / silver.previous) * 100,
-      high24h: silver.high,
-      low24h: silver.low,
-      volume: '89.2K',
-      marketCap: '$1.4T',
-      priceHistory: silverHistory
-    },
-    // Crypto
-    {
-      id: 'bitcoin',
-      name: 'Bitcoin',
-      symbol: 'BTC/USD',
-      category: 'crypto',
-      price: bitcoin.current,
-      priceUnit: '',
-      change: bitcoin.current - bitcoin.previous,
-      changePercent: ((bitcoin.current - bitcoin.previous) / bitcoin.previous) * 100,
-      high24h: bitcoin.high,
-      low24h: bitcoin.low,
-      volume: '24.5B',
-      marketCap: '$1.9T',
-      priceHistory: bitcoinHistory
-    },
-    {
-      id: 'ethereum',
-      name: 'Ethereum',
-      symbol: 'ETH/USD',
-      category: 'crypto',
-      price: ethereum.current,
-      priceUnit: '',
-      change: ethereum.current - ethereum.previous,
-      changePercent: ((ethereum.current - ethereum.previous) / ethereum.previous) * 100,
-      high24h: ethereum.high,
-      low24h: ethereum.low,
-      volume: '12.3B',
-      marketCap: '$410B',
-      priceHistory: ethereumHistory
-    },
-    // Indices
-    {
-      id: 'nasdaq100',
-      name: 'Nasdaq 100',
-      symbol: 'NDX',
-      category: 'index',
-      price: nasdaq.current,
-      priceUnit: '',
-      change: nasdaq.current - nasdaq.previous,
-      changePercent: ((nasdaq.current - nasdaq.previous) / nasdaq.previous) * 100,
-      high24h: nasdaq.high,
-      low24h: nasdaq.low,
-      volume: '4.2B',
-      marketCap: '$25T',
-      priceHistory: nasdaqHistory
-    },
-    {
-      id: 'sp500',
-      name: 'S&P 500',
-      symbol: 'SPX',
-      category: 'index',
-      price: sp500.current,
-      priceUnit: '',
-      change: sp500.current - sp500.previous,
-      changePercent: ((sp500.current - sp500.previous) / sp500.previous) * 100,
-      high24h: sp500.high,
-      low24h: sp500.low,
-      volume: '3.8B',
-      marketCap: '$42T',
-      priceHistory: sp500History
-    },
-    // ETFs
-    {
-      id: 'vym',
-      name: 'Vanguard High Dividend Yield',
-      symbol: 'VYM',
-      category: 'etf',
-      price: vym.current,
-      priceUnit: '',
-      change: vym.current - vym.previous,
-      changePercent: ((vym.current - vym.previous) / vym.previous) * 100,
-      high24h: vym.high,
-      low24h: vym.low,
-      volume: '2.1M',
-      marketCap: '$56B',
-      priceHistory: vymHistory,
-      dividendYield: 2.85,
-      expenseRatio: 0.06
-    },
-    {
-      id: 'vymi',
-      name: 'Vanguard Intl High Dividend',
-      symbol: 'VYMI',
-      category: 'etf',
-      price: vymi.current,
-      priceUnit: '',
-      change: vymi.current - vymi.previous,
-      changePercent: ((vymi.current - vymi.previous) / vymi.previous) * 100,
-      high24h: vymi.high,
-      low24h: vymi.low,
-      volume: '450K',
-      marketCap: '$8.5B',
-      priceHistory: vymiHistory,
-      dividendYield: 4.52,
-      expenseRatio: 0.22
-    },
-    {
-      id: 'gldm',
-      name: 'SPDR Gold MiniShares',
-      symbol: 'GLDM',
-      category: 'etf',
-      price: gldm.current,
-      priceUnit: '',
-      change: gldm.current - gldm.previous,
-      changePercent: ((gldm.current - gldm.previous) / gldm.previous) * 100,
-      high24h: gldm.high,
-      low24h: gldm.low,
-      volume: '3.5M',
-      marketCap: '$9.2B',
-      priceHistory: gldmHistory,
-      dividendYield: 0,
-      expenseRatio: 0.10
-    },
-    {
-      id: 'slv',
-      name: 'iShares Silver Trust',
-      symbol: 'SLV',
-      category: 'etf',
-      price: slv.current,
-      priceUnit: '',
-      change: slv.current - slv.previous,
-      changePercent: ((slv.current - slv.previous) / slv.previous) * 100,
-      high24h: slv.high,
-      low24h: slv.low,
-      volume: '12.5M',
-      marketCap: '$11.5B',
-      priceHistory: slvHistory,
-      dividendYield: 0,
-      expenseRatio: 0.50
-    }
-  ];
-}
-
+// Get technical indicators from price history
 export function getTechnicalIndicators(priceHistory: PricePoint[]): TechnicalIndicators {
-  // Handle empty or insufficient price history
-  if (!priceHistory || priceHistory.length < 2) {
+  if (!priceHistory || priceHistory.length === 0) {
     return {
       rsi: 50,
       macd: { value: 0, signal: 0, histogram: 0 },
@@ -636,10 +476,10 @@ export function getTechnicalIndicators(priceHistory: PricePoint[]): TechnicalInd
       bollingerBands: { upper: 0, middle: 0, lower: 0 },
       stochastic: { k: 50, d: 50 },
       atr: 0,
-      adx: 25
+      adx: 0,
     };
   }
-  
+
   const closes = priceHistory.map(p => p.close);
   
   return {
@@ -650,70 +490,29 @@ export function getTechnicalIndicators(priceHistory: PricePoint[]): TechnicalInd
       sma50: calculateSMA(closes, Math.min(50, closes.length)),
       sma200: calculateSMA(closes, Math.min(200, closes.length)),
       ema12: calculateEMA(closes, 12),
-      ema26: calculateEMA(closes, 26)
+      ema26: calculateEMA(closes, 26),
     },
     bollingerBands: calculateBollingerBands(closes),
     stochastic: calculateStochastic(priceHistory),
     atr: calculateATR(priceHistory),
-    adx: calculateADX(priceHistory)
+    adx: calculateADX(priceHistory),
   };
 }
 
-export function getSignal(indicators: TechnicalIndicators, currentPrice: number, assetName: string = 'Asset'): Signal {
+// Get trading signal
+export function getSignal(indicators: TechnicalIndicators, currentPrice: number, assetName: string): Signal {
   return generateSignal(indicators, currentPrice, assetName);
 }
 
+// Get trend analysis
 export function getTrendAnalysis(priceHistory: PricePoint[], currentPrice: number): TrendAnalysis {
-  // Handle empty or insufficient price history
-  if (!priceHistory || priceHistory.length < 2) {
-    return {
-      direction: 'NEUTRAL',
-      strength: 50,
-      support: currentPrice * 0.95,
-      resistance: currentPrice * 1.05,
-      pivotPoints: {
-        pp: currentPrice,
-        r1: currentPrice * 1.02,
-        r2: currentPrice * 1.04,
-        r3: currentPrice * 1.06,
-        s1: currentPrice * 0.98,
-        s2: currentPrice * 0.96,
-        s3: currentPrice * 0.94,
-      }
-    };
-  }
-  
   return calculateTrendAnalysis(priceHistory, currentPrice);
 }
 
-export function formatPrice(price: number, decimals: number = 2): string {
-  return price.toLocaleString('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
-  });
-}
-
-export function formatChange(change: number, percent: number): string {
-  const sign = change >= 0 ? '+' : '';
-  return `${sign}${formatPrice(change)} (${sign}${percent.toFixed(2)}%)`;
-}
-
-export function getCategoryIcon(category: CommodityData['category']): string {
-  switch (category) {
-    case 'metal': return '🏆';
-    case 'crypto': return '₿';
-    case 'index': return '📊';
-    case 'etf': return '📈';
-    default: return '💰';
-  }
-}
-
-export function getCategoryLabel(category: CommodityData['category']): string {
-  switch (category) {
-    case 'metal': return 'Precious Metal';
-    case 'crypto': return 'Cryptocurrency';
-    case 'index': return 'Stock Index';
-    case 'etf': return 'ETF';
-    default: return 'Asset';
-  }
+// DEPRECATED: This function should not be used anymore
+// All data should come from the backend API
+// Keeping for backwards compatibility but returns empty array
+export function getCommodityData(): CommodityData[] {
+  console.warn('getCommodityData() is deprecated. Use useLivePrices() hook instead.');
+  return [];
 }
