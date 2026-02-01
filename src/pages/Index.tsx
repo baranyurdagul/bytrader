@@ -11,7 +11,7 @@ import { usePriceAlerts } from '@/hooks/usePriceAlerts';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useAuth } from '@/hooks/useAuth';
 import { getCommodityData } from '@/lib/tradingData';
-import { RefreshCw, Wifi, WifiOff, Bell, BellRing, Scale, Star, TrendingUp, Grid3X3, List } from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff, Bell, BellRing, Scale, Star, TrendingUp, Grid3X3, List, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 const Index = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { commodities: liveCommodities, isLoading, error, lastUpdated, dataFreshness, refetch } = useLivePrices(60000);
+  const { commodities: liveCommodities, isLoading, error, lastUpdated, dataFreshness, refetch, forceRefresh } = useLivePrices(60000);
   const { 
     alerts, 
     addAlert, 
@@ -172,6 +172,18 @@ const Index = () => {
               className="h-8 w-8"
             >
               <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={forceRefresh}
+              disabled={isLoading}
+              title="Force refresh - clears all caches"
+              className="gap-1.5 text-xs"
+            >
+              <RotateCcw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
+              Force
             </Button>
           </div>
         </div>
