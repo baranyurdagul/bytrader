@@ -29,15 +29,15 @@ const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes before marking as stale
 
 // Yahoo Finance tickers for commodities, indices, and ETFs
 const YAHOO_TICKERS = {
-  gold: 'GC=F',      // Gold Futures
-  silver: 'SI=F',    // Silver Futures
-  nasdaq100: '^NDX', // Nasdaq 100 Index
-  sp500: '^GSPC',    // S&P 500 Index
-  // ETFs
-  vym: 'VYM',        // Vanguard High Dividend Yield ETF
-  vymi: 'VYMI',      // Vanguard International High Dividend Yield ETF
-  gldm: 'GLDM',      // SPDR Gold MiniShares Trust
-  slv: 'SLV',        // iShares Silver Trust
+  gold: 'GC=F',        // Gold Futures (COMEX) - most reliable
+  silver: 'SI=F',      // Silver Futures (COMEX) - most reliable
+  nasdaq100: '^NDX',   // Nasdaq 100 Index
+  sp500: '^GSPC',      // S&P 500 Index
+  // ETFs for display
+  vym: 'VYM',          // Vanguard High Dividend Yield ETF
+  vymi: 'VYMI',        // Vanguard International High Dividend Yield ETF
+  gldm: 'GLDM',        // SPDR Gold MiniShares Trust
+  slv: 'SLV',          // iShares Silver Trust
 };
 
 // Fetch quote from Yahoo Finance
@@ -82,9 +82,9 @@ async function fetchYahooQuote(ticker: string): Promise<any | null> {
   }
 }
 
-// Fetch metal prices from Yahoo Finance
+// Fetch metal prices from Yahoo Finance futures
 async function fetchMetalPrices(): Promise<PriceData[]> {
-  console.log('Fetching metal prices from Yahoo Finance...');
+  console.log('Fetching metal prices from Yahoo Finance futures...');
   
   const [goldQuote, silverQuote] = await Promise.all([
     fetchYahooQuote(YAHOO_TICKERS.gold),
@@ -114,8 +114,8 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
     };
     results.push(priceData);
     priceCache.set('gold', { ...priceData, lastUpdated: now });
+    console.log(`Gold (GC=F): $${goldQuote.price.toFixed(2)}`);
   } else {
-    // Use cached data if available, no random generation
     const cached = priceCache.get('gold');
     if (cached) {
       results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
@@ -142,6 +142,7 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
     };
     results.push(priceData);
     priceCache.set('silver', { ...priceData, lastUpdated: now });
+    console.log(`Silver (SI=F): $${silverQuote.price.toFixed(2)}`);
   } else {
     const cached = priceCache.get('silver');
     if (cached) {
