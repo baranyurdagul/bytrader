@@ -119,11 +119,11 @@ export function ArbitrageSpreadTile() {
                 <div className="space-y-1.5 text-[10px]">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">COMEX:</span>
-                    <span className="font-mono font-medium text-foreground">{formatPrice(goldData.comex.price)}</span>
+                    <span className="font-mono font-medium text-success">{formatPrice(goldData.comex.price)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Shanghai:</span>
-                    <span className="font-mono font-medium text-foreground">
+                    <span className="font-mono font-medium text-success">
                       {goldData.shanghai.priceUSD > 0 ? formatPrice(goldData.shanghai.priceUSD) : '--'}
                     </span>
                   </div>
@@ -163,11 +163,11 @@ export function ArbitrageSpreadTile() {
                 <div className="space-y-1.5 text-[10px]">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">COMEX:</span>
-                    <span className="font-mono font-medium text-foreground">{formatPrice(silverData.comex.price)}</span>
+                    <span className="font-mono font-medium text-success">{formatPrice(silverData.comex.price)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Shanghai:</span>
-                    <span className="font-mono font-medium text-foreground">
+                    <span className="font-mono font-medium text-success">
                       {silverData.shanghai.priceUSD > 0 ? formatPrice(silverData.shanghai.priceUSD) : '--'}
                     </span>
                   </div>
