@@ -57,15 +57,15 @@ export function Header() {
 
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-3 md:py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-3">
-              <div className="p-2 rounded-lg gradient-gold">
-                <Coins className="w-6 h-6 text-primary-foreground" />
+          <div className="flex items-center gap-4 md:gap-6">
+            <Link to="/" className="flex items-center gap-2 md:gap-3">
+              <div className="p-1.5 md:p-2 rounded-lg gradient-gold">
+                <Coins className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-foreground">MetalTrader Pro</h1>
+                <h1 className="text-lg md:text-xl font-bold text-foreground">MetalTrader Pro</h1>
                 <p className="text-xs text-muted-foreground">Commodities Analysis Platform</p>
               </div>
             </Link>
@@ -197,6 +197,20 @@ export function Header() {
                 </Link>
               </Button>
             )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Mobile Spread Tiles - Scrollable Row */}
+      <div className="md:hidden border-t border-border/50 bg-background/50">
+        <div className="container mx-auto px-2 py-2">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+            <div className="flex-shrink-0">
+              <GoldSpreadTile />
+            </div>
+            <div className="flex-shrink-0">
+              <SilverSpreadTile />
+            </div>
           </div>
         </div>
       </div>

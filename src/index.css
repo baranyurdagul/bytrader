@@ -196,6 +196,16 @@
     border-radius: 3px;
   }
 
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Safe area for devices with notches */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0);
