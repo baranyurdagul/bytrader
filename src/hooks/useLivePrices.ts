@@ -53,8 +53,6 @@ async function fetchHistoricalPrices(
         headers: {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
         },
         cache: 'no-store',
       }
@@ -129,13 +127,8 @@ export function useLivePrices(refreshInterval: number = 60000) {
         return;
       }
 
-      // Add cache-busting timestamp to bypass PWA/browser caching
-      const { data, error: fetchError } = await supabase.functions.invoke('fetch-prices', {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
-      });
+      // Invoke without custom cache headers (causes CORS issues)
+      const { data, error: fetchError } = await supabase.functions.invoke('fetch-prices');
       
       if (fetchError) {
         throw new Error(fetchError.message);
