@@ -38,7 +38,7 @@ const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 
 // Conversion constants
 const GRAMS_PER_TROY_OZ = 31.1035;
-const GLD_OZ_PER_SHARE = 0.159;  // GLD holds ~0.159 oz gold per share (recalibrated Feb 2026)
+const GLD_OZ_PER_SHARE = 0.091;  // GLD holds ~0.091 oz gold per share
 
 // Fetch COMEX gold price derived from GLD ETF
 // GLD is more reliable than futures contracts for spot price approximation
