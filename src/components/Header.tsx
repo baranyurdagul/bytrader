@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { SilverSpreadTile } from '@/components/SilverSpreadTile';
-
+import { GoldSpreadTile } from '@/components/GoldSpreadTile';
 export function Header() {
   const location = useLocation();
   const { user, signOut, isAuthenticated } = useAuth();
@@ -138,8 +138,9 @@ export function Header() {
               )} />
             </Button>
             
-            {/* Silver Spread Tile */}
-            <div className="hidden lg:block">
+            {/* Gold & Silver Spread Tiles */}
+            <div className="hidden md:flex items-center gap-2">
+              <GoldSpreadTile />
               <SilverSpreadTile />
             </div>
             
