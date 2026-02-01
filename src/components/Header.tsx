@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { SilverSpreadTile } from '@/components/SilverSpreadTile';
 
 export function Header() {
   const location = useLocation();
@@ -136,6 +137,11 @@ export function Header() {
                 isRefreshing && "animate-spin"
               )} />
             </Button>
+            
+            {/* Silver Spread Tile */}
+            <div className="hidden lg:block">
+              <SilverSpreadTile />
+            </div>
             
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/20">
               <Activity className="w-4 h-4 text-success animate-pulse" />
