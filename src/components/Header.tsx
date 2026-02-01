@@ -13,11 +13,19 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { ArbitrageSpreadTile } from '@/components/ArbitrageSpreadTile';
+import { FloatingTicker } from '@/components/FloatingTicker';
+import { useLivePrices } from '@/hooks/useLivePrices';
+import { getCommodityData } from '@/lib/tradingData';
+
 export function Header() {
   const location = useLocation();
   const { user, signOut, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { commodities: liveCommodities } = useLivePrices(60000);
+  
+  // Fall back to simulated data if live data is not available
+  const commodities = liveCommodities.length > 0 ? liveCommodities : getCommodityData();
 
   const handleSignOut = async () => {
     await signOut();
@@ -55,7 +63,10 @@ export function Header() {
   };
 
   return (
-    <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
+    <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 safe-area-top">
+      {/* Scrolling Ticker at the very top */}
+      <FloatingTicker commodities={commodities} />
+      
       <div className="container mx-auto px-4 py-3 md:py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 md:gap-6">
