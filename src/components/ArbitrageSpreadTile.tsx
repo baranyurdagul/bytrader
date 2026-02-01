@@ -1,10 +1,12 @@
 import { useGoldSpread } from '@/hooks/useGoldSpread';
 import { useSilverSpread } from '@/hooks/useSilverSpread';
-import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { RefreshCw, TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useNavigate } from 'react-router-dom';
 
 export function ArbitrageSpreadTile() {
+  const navigate = useNavigate();
   const { data: goldData, isLoading: goldLoading, refetch: refetchGold } = useGoldSpread(60000);
   const { data: silverData, isLoading: silverLoading, refetch: refetchSilver } = useSilverSpread(60000);
 
@@ -58,10 +60,10 @@ export function ArbitrageSpreadTile() {
   return (
     <div 
       className={cn(
-        "glass-card rounded-xl overflow-hidden cursor-pointer transition-all hover:shadow-lg",
+        "glass-card rounded-xl overflow-hidden cursor-pointer transition-all hover:shadow-lg active:scale-[0.98]",
         isCached && "border-warning/30"
       )}
-      onClick={handleRefresh}
+      onClick={() => navigate('/arbitrage')}
     >
       {/* Header */}
       <div className="p-4 bg-gradient-to-r from-primary/10 to-amber-500/10 border-b border-border/50">
@@ -80,7 +82,7 @@ export function ArbitrageSpreadTile() {
             {isCached && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/20 text-warning">cached</span>
             )}
-            <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </div>
         </div>
       </div>
@@ -178,7 +180,7 @@ export function ArbitrageSpreadTile() {
         </div>
         
         <p className="text-[10px] text-muted-foreground mt-3 text-center">
-          Tap to refresh • {goldData?.shanghai?.session || silverData?.shanghai?.session || 'PM'} session
+          Tap for trends • {goldData?.shanghai?.session || silverData?.shanghai?.session || 'PM'} session
         </p>
       </div>
     </div>

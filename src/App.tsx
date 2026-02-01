@@ -13,6 +13,7 @@ import Assistant from "./pages/Assistant";
 import News from "./pages/News";
 import Currency from "./pages/Currency";
 import Profile from "./pages/Profile";
+import Arbitrage from "./pages/Arbitrage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/currency" element={<Currency />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/install" element={<Install />} />
+          <Route path="/arbitrage" element={<Arbitrage />} />
           <Route path="/asset/:assetId" element={<AssetDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
