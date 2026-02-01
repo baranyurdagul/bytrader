@@ -45,13 +45,18 @@ async function fetchHistoricalPrices(
   const sourceProvider = getSourceProvider(category);
   
   try {
+    // Add cache-busting timestamp to bypass PWA/browser caching
+    const cacheBuster = Date.now();
     const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-historical-prices?asset=${assetId}&category=${category}&days=${days}`,
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-historical-prices?asset=${assetId}&category=${category}&days=${days}&_t=${cacheBuster}`,
       {
         headers: {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        }
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+        cache: 'no-store',
       }
     );
     
@@ -124,7 +129,13 @@ export function useLivePrices(refreshInterval: number = 60000) {
         return;
       }
 
-      const { data, error: fetchError } = await supabase.functions.invoke('fetch-prices');
+      // Add cache-busting timestamp to bypass PWA/browser caching
+      const { data, error: fetchError } = await supabase.functions.invoke('fetch-prices', {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
       
       if (fetchError) {
         throw new Error(fetchError.message);
