@@ -34,51 +34,69 @@ interface GoldSpreadData {
 // Cache for storing last known good data
 let dataCache: GoldSpreadData | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 
 // Conversion constants
 const GRAMS_PER_TROY_OZ = 31.1035;
 
 // Fetch COMEX gold from Yahoo Finance
+// Try multiple tickers to get the most accurate current price
 async function fetchComexGold(): Promise<{ price: number; change: number; changePercent: number } | null> {
-  try {
-    const response = await fetch(
-      'https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=2d',
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
+  // Try the front-month contract first (more accurate), then fall back to generic
+  const tickers = ['GCG26.CMX', 'GCH26.CMX', 'GC=F'];
+  
+  for (const ticker of tickers) {
+    try {
+      const response = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        console.error(`Yahoo Finance error for ${ticker}:`, response.status);
+        continue;
       }
-    );
-    
-    if (!response.ok) {
-      console.error('Yahoo Finance error:', response.status);
-      return null;
+      
+      const data = await response.json();
+      const result = data?.chart?.result?.[0];
+      
+      if (!result?.meta?.regularMarketPrice) {
+        console.error(`No price data for ${ticker}`);
+        continue;
+      }
+      
+      const meta = result.meta;
+      const price = meta.regularMarketPrice;
+      const previousClose = meta.chartPreviousClose || meta.previousClose || price;
+      
+      // Sanity check: gold prices should be reasonable (between $1500 and $10000/oz in 2026)
+      if (price < 1500 || price > 10000) {
+        console.error(`Suspicious gold price from ${ticker}: $${price} - skipping`);
+        continue;
+      }
+      
+      // Check for reasonable change (max 20% daily move)
+      const changeFromPrev = Math.abs((price - previousClose) / previousClose);
+      if (changeFromPrev > 0.2 && previousClose > 1500) {
+        console.warn(`Large price discrepancy for ${ticker}: $${price} vs prev $${previousClose} (${(changeFromPrev * 100).toFixed(1)}%)`);
+      }
+      
+      const change = price - previousClose;
+      const changePercent = previousClose ? (change / previousClose) * 100 : 0;
+      
+      console.log(`COMEX Gold (${ticker}): $${price}/oz (prev: $${previousClose})`);
+      return { price, change, changePercent };
+    } catch (error) {
+      console.error(`Error fetching ${ticker}:`, error);
+      continue;
     }
-    
-    const data = await response.json();
-    const result = data?.chart?.result?.[0];
-    
-    if (!result?.meta) {
-      console.error('No COMEX gold data');
-      return null;
-    }
-    
-    const meta = result.meta;
-    const quote = result.indicators?.quote?.[0];
-    const lastIdx = quote?.close?.length - 1 || 0;
-    
-    const price = meta.regularMarketPrice || quote?.close?.[lastIdx];
-    const previousClose = meta.chartPreviousClose || meta.previousClose;
-    const change = price - (previousClose || price);
-    const changePercent = previousClose ? (change / previousClose) * 100 : 0;
-    
-    console.log(`COMEX Gold: $${price}/oz`);
-    return { price, change, changePercent };
-  } catch (error) {
-    console.error('Error fetching COMEX gold:', error);
-    return null;
   }
+  
+  return null;
 }
 
 // Fetch USD/CNY exchange rate

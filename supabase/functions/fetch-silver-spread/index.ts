@@ -34,52 +34,92 @@ interface SilverSpreadData {
 // Cache for storing last known good data
 let dataCache: SilverSpreadData | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 
 // Conversion constants
 const GRAMS_PER_TROY_OZ = 31.1035;
 const GRAMS_PER_KG = 1000;
 
-// Fetch COMEX silver from Yahoo Finance
+// Fetch COMEX silver from Yahoo Finance with parallel fetching for reliability
 async function fetchComexSilver(): Promise<{ price: number; change: number; changePercent: number } | null> {
-  try {
-    const response = await fetch(
-      'https://query1.finance.yahoo.com/v8/finance/chart/SI=F?interval=1d&range=2d',
-      {
+  const tickers = ['SIH26.CMX', 'SIG26.CMX', 'SI=F'];
+  
+  // Fetch all tickers in parallel
+  const fetchPromises = tickers.map(async (ticker) => {
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d&t=${Date.now()}`;
+      const response = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Cache-Control': 'no-cache',
         },
-      }
-    );
-    
-    if (!response.ok) {
-      console.error('Yahoo Finance error:', response.status);
+      });
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const result = data?.chart?.result?.[0];
+      if (!result?.meta?.regularMarketPrice) return null;
+      
+      const meta = result.meta;
+      const price = meta.regularMarketPrice;
+      const previousClose = meta.chartPreviousClose || meta.previousClose || price;
+      
+      // Basic bounds check
+      if (price < 20 || price > 200) return null;
+      
+      console.log(`${ticker}: $${price}/oz (prev: $${previousClose})`);
+      return { ticker, price, previousClose };
+    } catch {
       return null;
     }
-    
-    const data = await response.json();
-    const result = data?.chart?.result?.[0];
-    
-    if (!result?.meta) {
-      console.error('No COMEX silver data');
-      return null;
-    }
-    
-    const meta = result.meta;
-    const quote = result.indicators?.quote?.[0];
-    const lastIdx = quote?.close?.length - 1 || 0;
-    
-    const price = meta.regularMarketPrice || quote?.close?.[lastIdx];
-    const previousClose = meta.chartPreviousClose || meta.previousClose;
-    const change = price - (previousClose || price);
-    const changePercent = previousClose ? (change / previousClose) * 100 : 0;
-    
-    console.log(`COMEX Silver: $${price}/oz`);
-    return { price, change, changePercent };
-  } catch (error) {
-    console.error('Error fetching COMEX silver:', error);
+  });
+  
+  const results = await Promise.all(fetchPromises);
+  const validResults = results.filter(r => r !== null) as Array<{ ticker: string; price: number; previousClose: number }>;
+  
+  if (validResults.length === 0) {
+    console.error('All silver ticker sources failed');
     return null;
   }
+  
+  // CRITICAL: Filter out prices with unrealistic swings from previousClose (>20%)
+  // This catches stale data from Yahoo's CDN
+  const trustworthyResults = validResults.filter(r => {
+    const changeFromPrev = Math.abs((r.price - r.previousClose) / r.previousClose);
+    if (changeFromPrev > 0.20) {
+      console.warn(`FILTERED: ${r.ticker} $${r.price} vs prev $${r.previousClose} (${(changeFromPrev * 100).toFixed(1)}% swing)`);
+      return false;
+    }
+    return true;
+  });
+  
+  if (trustworthyResults.length === 0) {
+    console.error('All silver prices failed validation (>20% swing from previousClose)');
+    // Fallback: use the price closest to its previous close if all failed
+    const sortedBySwing = [...validResults].sort((a, b) => {
+      const aSwing = Math.abs((a.price - a.previousClose) / a.previousClose);
+      const bSwing = Math.abs((b.price - b.previousClose) / b.previousClose);
+      return aSwing - bSwing;
+    });
+    console.warn(`Using fallback: ${sortedBySwing[0].ticker} with lowest swing`);
+    const { ticker, price, previousClose } = sortedBySwing[0];
+    const change = price - previousClose;
+    const changePercent = previousClose ? (change / previousClose) * 100 : 0;
+    console.log(`COMEX Silver (${ticker} fallback): $${price}/oz (prev: $${previousClose})`);
+    return { price, change, changePercent };
+  }
+  
+  // Sort trustworthy results by price descending (prefer higher/more current)
+  trustworthyResults.sort((a, b) => b.price - a.price);
+  const selectedResult = trustworthyResults[0];
+  
+  const { ticker, price, previousClose } = selectedResult;
+  const change = price - previousClose;
+  const changePercent = previousClose ? (change / previousClose) * 100 : 0;
+  
+  console.log(`COMEX Silver (${ticker} selected): $${price}/oz (prev: $${previousClose})`);
+  return { price, change, changePercent };
 }
 
 // Fetch USD/CNY exchange rate
