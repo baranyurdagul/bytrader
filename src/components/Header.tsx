@@ -138,12 +138,6 @@ export function Header() {
               )} />
             </Button>
             
-            {/* Gold & Silver Spread Tiles */}
-            <div className="hidden md:flex items-center gap-2">
-              <GoldSpreadTile />
-              <SilverSpreadTile />
-            </div>
-            
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/20">
               <Activity className="w-4 h-4 text-success animate-pulse" />
               <span className="text-xs font-medium text-success">Markets Open</span>
@@ -201,16 +195,12 @@ export function Header() {
         </div>
       </div>
       
-      {/* Mobile Spread Tiles - Scrollable Row */}
-      <div className="md:hidden border-t border-border/50 bg-background/50">
-        <div className="container mx-auto px-2 py-2">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-            <div className="flex-shrink-0">
-              <GoldSpreadTile />
-            </div>
-            <div className="flex-shrink-0">
-              <SilverSpreadTile />
-            </div>
+      {/* Arbitrage Spread Tiles Section */}
+      <div className="border-t border-border/50 bg-background/50">
+        <div className="container mx-auto px-4 py-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <GoldSpreadTile />
+            <SilverSpreadTile />
           </div>
         </div>
       </div>
