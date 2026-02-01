@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.trading-assistant]
 verify_jwt = false
+
+[functions.fetch-arbitrage-history]
+verify_jwt = false
+
+[functions.save-arbitrage-snapshot]
+verify_jwt = false
