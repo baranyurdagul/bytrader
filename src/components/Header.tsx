@@ -12,8 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { SilverSpreadTile } from '@/components/SilverSpreadTile';
-import { GoldSpreadTile } from '@/components/GoldSpreadTile';
+import { ArbitrageSpreadTile } from '@/components/ArbitrageSpreadTile';
 export function Header() {
   const location = useLocation();
   const { user, signOut, isAuthenticated } = useAuth();
@@ -195,13 +194,10 @@ export function Header() {
         </div>
       </div>
       
-      {/* Arbitrage Spread Tiles Section */}
+      {/* Arbitrage Spread Tile Section */}
       <div className="border-t border-border/50 bg-background/50">
         <div className="container mx-auto px-4 py-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <GoldSpreadTile />
-            <SilverSpreadTile />
-          </div>
+          <ArbitrageSpreadTile />
         </div>
       </div>
     </header>
