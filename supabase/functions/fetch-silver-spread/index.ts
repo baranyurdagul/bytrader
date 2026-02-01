@@ -39,7 +39,7 @@ const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 // Conversion constants
 const GRAMS_PER_TROY_OZ = 31.1035;
 const GRAMS_PER_KG = 1000;
-const SLV_OZ_PER_SHARE = 0.885;  // SLV holds ~0.885 oz silver per share
+const SLV_OZ_PER_SHARE = 2.43;  // SLV holds ~2.43 oz silver per share (recalibrated Feb 2026)
 
 // Fetch COMEX silver price derived from SLV ETF
 // SLV is more reliable than futures contracts for spot price approximation
