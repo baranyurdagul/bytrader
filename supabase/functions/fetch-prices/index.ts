@@ -42,12 +42,12 @@ const YAHOO_TICKERS = {
   slv: 'SLV',          // iShares Silver Trust
 };
 
-// GLD holds roughly 0.159 oz of gold per share (recalibrated Feb 2026)
-// So spot gold = GLD price / 0.159 
-// SLV holds roughly 2.43 oz of silver per share (recalibrated Feb 2026)
-// So spot silver = SLV price / 2.43
-const GLD_OZ_PER_SHARE = 0.159;  
-const SLV_OZ_PER_SHARE = 2.43;
+// GLD holds roughly 0.091 oz of gold per share
+// So spot gold = GLD price / 0.091 
+// SLV holds roughly 0.885 oz of silver per share
+// So spot silver = SLV price / 0.885
+const GLD_OZ_PER_SHARE = 0.091;  
+const SLV_OZ_PER_SHARE = 0.885;
 
 // Fetch quote from Yahoo Finance
 async function fetchYahooQuote(ticker: string): Promise<any | null> {
