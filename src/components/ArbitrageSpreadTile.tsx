@@ -89,7 +89,7 @@ export function ArbitrageSpreadTile() {
       
       {/* Content Grid - Gold & Silver Side by Side */}
       <div className="p-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-[1fr_auto_1fr] gap-4">
           {/* Gold Section */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -133,6 +133,9 @@ export function ArbitrageSpreadTile() {
               <p className="text-xs text-muted-foreground">Data unavailable</p>
             )}
           </div>
+          
+          {/* Separator */}
+          <div className="w-px bg-border/50 self-stretch" />
           
           {/* Silver Section */}
           <div className="space-y-3">
