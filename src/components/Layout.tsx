@@ -26,19 +26,8 @@ export function Layout({ children, showHeader = true }: LayoutProps) {
         />
       )}
       
-      {/* Only show header on desktop */}
-      {showHeader && !isMobile && <Header />}
-      
-      {/* Mobile header - simplified */}
-      {showHeader && isMobile && (
-        <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-xl border-b border-border">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center justify-center">
-              <h1 className="text-lg font-bold text-foreground">MetalTrader Pro</h1>
-            </div>
-          </div>
-        </header>
-      )}
+      {/* Show Header on all screen sizes */}
+      {showHeader && <Header />}
       
       {/* Main content with bottom padding for mobile nav */}
       <main 
