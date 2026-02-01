@@ -42,7 +42,8 @@ const GRAMS_PER_KG = 1000;
 
 // Fetch COMEX silver from Yahoo Finance with parallel fetching for reliability
 async function fetchComexSilver(): Promise<{ price: number; change: number; changePercent: number } | null> {
-  const tickers = ['SIH26.CMX', 'SIG26.CMX', 'SI=F'];
+  // Use front-month and generic futures ticker
+  const tickers = ['SI=F', 'SIH26.CMX', 'SIG26.CMX'];
   
   // Fetch all tickers in parallel
   const fetchPromises = tickers.map(async (ticker) => {
@@ -65,8 +66,11 @@ async function fetchComexSilver(): Promise<{ price: number; change: number; chan
       const price = meta.regularMarketPrice;
       const previousClose = meta.chartPreviousClose || meta.previousClose || price;
       
-      // Basic bounds check
-      if (price < 20 || price > 200) return null;
+      // Basic bounds check for silver (reasonable range: $15-$200/oz)
+      if (price < 15 || price > 200) {
+        console.warn(`${ticker}: Price $${price} outside bounds, skipping`);
+        return null;
+      }
       
       console.log(`${ticker}: $${price}/oz (prev: $${previousClose})`);
       return { ticker, price, previousClose };
@@ -83,42 +87,15 @@ async function fetchComexSilver(): Promise<{ price: number; change: number; chan
     return null;
   }
   
-  // CRITICAL: Filter out prices with unrealistic swings from previousClose (>20%)
-  // This catches stale data from Yahoo's CDN
-  const trustworthyResults = validResults.filter(r => {
-    const changeFromPrev = Math.abs((r.price - r.previousClose) / r.previousClose);
-    if (changeFromPrev > 0.20) {
-      console.warn(`FILTERED: ${r.ticker} $${r.price} vs prev $${r.previousClose} (${(changeFromPrev * 100).toFixed(1)}% swing)`);
-      return false;
-    }
-    return true;
-  });
-  
-  if (trustworthyResults.length === 0) {
-    console.error('All silver prices failed validation (>20% swing from previousClose)');
-    // Fallback: use the price closest to its previous close if all failed
-    const sortedBySwing = [...validResults].sort((a, b) => {
-      const aSwing = Math.abs((a.price - a.previousClose) / a.previousClose);
-      const bSwing = Math.abs((b.price - b.previousClose) / b.previousClose);
-      return aSwing - bSwing;
-    });
-    console.warn(`Using fallback: ${sortedBySwing[0].ticker} with lowest swing`);
-    const { ticker, price, previousClose } = sortedBySwing[0];
-    const change = price - previousClose;
-    const changePercent = previousClose ? (change / previousClose) * 100 : 0;
-    console.log(`COMEX Silver (${ticker} fallback): $${price}/oz (prev: $${previousClose})`);
-    return { price, change, changePercent };
-  }
-  
-  // Sort trustworthy results by price descending (prefer higher/more current)
-  trustworthyResults.sort((a, b) => b.price - a.price);
-  const selectedResult = trustworthyResults[0];
-  
+  // Use the first valid result (SI=F is preferred as it's the generic front-month)
+  const selectedResult = validResults[0];
   const { ticker, price, previousClose } = selectedResult;
+  
+  // Calculate change from previous close (even if prev close seems off, show the data)
   const change = price - previousClose;
   const changePercent = previousClose ? (change / previousClose) * 100 : 0;
   
-  console.log(`COMEX Silver (${ticker} selected): $${price}/oz (prev: $${previousClose})`);
+  console.log(`COMEX Silver (${ticker}): $${price}/oz, change: ${change.toFixed(2)} (${changePercent.toFixed(2)}%)`);
   return { price, change, changePercent };
 }
 
