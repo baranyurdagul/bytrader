@@ -40,63 +40,58 @@ const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 const GRAMS_PER_TROY_OZ = 31.1035;
 const GRAMS_PER_KG = 1000;
 
-// Fetch COMEX silver from Yahoo Finance with parallel fetching for reliability
+// SLV holds roughly 0.885 oz of silver per share
+// So spot silver = SLV price / 0.885
+const SLV_OZ_PER_SHARE = 0.885;
+
+// Fetch COMEX silver spot price via SLV ETF from Yahoo Finance
 async function fetchComexSilver(): Promise<{ price: number; change: number; changePercent: number } | null> {
-  // Use front-month and generic futures ticker
-  const tickers = ['SI=F', 'SIH26.CMX', 'SIG26.CMX'];
-  
-  // Fetch all tickers in parallel
-  const fetchPromises = tickers.map(async (ticker) => {
-    try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d&t=${Date.now()}`;
-      const response = await fetch(url, {
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/SLV?interval=1d&range=2d`,
+      {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Cache-Control': 'no-cache',
         },
-      });
-      
-      if (!response.ok) return null;
-      
-      const data = await response.json();
-      const result = data?.chart?.result?.[0];
-      if (!result?.meta?.regularMarketPrice) return null;
-      
-      const meta = result.meta;
-      const price = meta.regularMarketPrice;
-      const previousClose = meta.chartPreviousClose || meta.previousClose || price;
-      
-      // Basic bounds check for silver (reasonable range: $15-$200/oz)
-      if (price < 15 || price > 200) {
-        console.warn(`${ticker}: Price $${price} outside bounds, skipping`);
-        return null;
       }
-      
-      console.log(`${ticker}: $${price}/oz (prev: $${previousClose})`);
-      return { ticker, price, previousClose };
-    } catch {
+    );
+    
+    if (!response.ok) {
+      console.error(`Yahoo Finance error for SLV:`, response.status);
       return null;
     }
-  });
-  
-  const results = await Promise.all(fetchPromises);
-  const validResults = results.filter(r => r !== null) as Array<{ ticker: string; price: number; previousClose: number }>;
-  
-  if (validResults.length === 0) {
-    console.error('All silver ticker sources failed');
+    
+    const data = await response.json();
+    const result = data?.chart?.result?.[0];
+    
+    if (!result?.meta?.regularMarketPrice) {
+      console.error(`No price data for SLV`);
+      return null;
+    }
+    
+    const meta = result.meta;
+    const slvPrice = meta.regularMarketPrice;
+    const slvPrevClose = meta.chartPreviousClose || meta.previousClose || slvPrice;
+    
+    // Convert SLV ETF price to spot silver price per oz
+    const spotPrice = slvPrice / SLV_OZ_PER_SHARE;
+    const spotPrevClose = slvPrevClose / SLV_OZ_PER_SHARE;
+    
+    // Sanity check: silver prices should be reasonable (between $20 and $100/oz)
+    if (spotPrice < 20 || spotPrice > 100) {
+      console.error(`Suspicious silver spot price: $${spotPrice.toFixed(2)} - skipping`);
+      return null;
+    }
+    
+    const change = spotPrice - spotPrevClose;
+    const changePercent = spotPrevClose ? (change / spotPrevClose) * 100 : 0;
+    
+    console.log(`COMEX Silver Spot (via SLV): $${spotPrice.toFixed(2)}/oz (SLV: $${slvPrice.toFixed(2)})`);
+    return { price: spotPrice, change, changePercent };
+  } catch (error) {
+    console.error(`Error fetching SLV:`, error);
     return null;
   }
-  
-  // Use the first valid result (SI=F is preferred as it's the generic front-month)
-  const selectedResult = validResults[0];
-  const { ticker, price, previousClose } = selectedResult;
-  
-  // Calculate change from previous close (even if prev close seems off, show the data)
-  const change = price - previousClose;
-  const changePercent = previousClose ? (change / previousClose) * 100 : 0;
-  
-  console.log(`COMEX Silver (${ticker}): $${price}/oz, change: ${change.toFixed(2)} (${changePercent.toFixed(2)}%)`);
-  return { price, change, changePercent };
 }
 
 // Fetch USD/CNY exchange rate

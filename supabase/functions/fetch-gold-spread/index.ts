@@ -39,64 +39,58 @@ const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 // Conversion constants
 const GRAMS_PER_TROY_OZ = 31.1035;
 
-// Fetch COMEX gold from Yahoo Finance
-// Try multiple tickers to get the most accurate current price
+// GLD holds roughly 0.091 oz of gold per share
+// So spot gold = GLD price / 0.091
+const GLD_OZ_PER_SHARE = 0.091;
+
+// Fetch COMEX gold spot price via GLD ETF from Yahoo Finance
 async function fetchComexGold(): Promise<{ price: number; change: number; changePercent: number } | null> {
-  // Try the front-month contract first (more accurate), then fall back to generic
-  const tickers = ['GCG26.CMX', 'GCH26.CMX', 'GC=F'];
-  
-  for (const ticker of tickers) {
-    try {
-      const response = await fetch(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`,
-        {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        console.error(`Yahoo Finance error for ${ticker}:`, response.status);
-        continue;
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/GLD?interval=1d&range=2d`,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
       }
-      
-      const data = await response.json();
-      const result = data?.chart?.result?.[0];
-      
-      if (!result?.meta?.regularMarketPrice) {
-        console.error(`No price data for ${ticker}`);
-        continue;
-      }
-      
-      const meta = result.meta;
-      const price = meta.regularMarketPrice;
-      const previousClose = meta.chartPreviousClose || meta.previousClose || price;
-      
-      // Sanity check: gold prices should be reasonable (between $1500 and $10000/oz in 2026)
-      if (price < 1500 || price > 10000) {
-        console.error(`Suspicious gold price from ${ticker}: $${price} - skipping`);
-        continue;
-      }
-      
-      // Check for reasonable change (max 20% daily move)
-      const changeFromPrev = Math.abs((price - previousClose) / previousClose);
-      if (changeFromPrev > 0.2 && previousClose > 1500) {
-        console.warn(`Large price discrepancy for ${ticker}: $${price} vs prev $${previousClose} (${(changeFromPrev * 100).toFixed(1)}%)`);
-      }
-      
-      const change = price - previousClose;
-      const changePercent = previousClose ? (change / previousClose) * 100 : 0;
-      
-      console.log(`COMEX Gold (${ticker}): $${price}/oz (prev: $${previousClose})`);
-      return { price, change, changePercent };
-    } catch (error) {
-      console.error(`Error fetching ${ticker}:`, error);
-      continue;
+    );
+    
+    if (!response.ok) {
+      console.error(`Yahoo Finance error for GLD:`, response.status);
+      return null;
     }
+    
+    const data = await response.json();
+    const result = data?.chart?.result?.[0];
+    
+    if (!result?.meta?.regularMarketPrice) {
+      console.error(`No price data for GLD`);
+      return null;
+    }
+    
+    const meta = result.meta;
+    const gldPrice = meta.regularMarketPrice;
+    const gldPrevClose = meta.chartPreviousClose || meta.previousClose || gldPrice;
+    
+    // Convert GLD ETF price to spot gold price per oz
+    const spotPrice = gldPrice / GLD_OZ_PER_SHARE;
+    const spotPrevClose = gldPrevClose / GLD_OZ_PER_SHARE;
+    
+    // Sanity check: gold prices should be reasonable (between $2000 and $6000/oz)
+    if (spotPrice < 2000 || spotPrice > 6000) {
+      console.error(`Suspicious gold spot price: $${spotPrice.toFixed(2)} - skipping`);
+      return null;
+    }
+    
+    const change = spotPrice - spotPrevClose;
+    const changePercent = spotPrevClose ? (change / spotPrevClose) * 100 : 0;
+    
+    console.log(`COMEX Gold Spot (via GLD): $${spotPrice.toFixed(2)}/oz (GLD: $${gldPrice.toFixed(2)})`);
+    return { price: spotPrice, change, changePercent };
+  } catch (error) {
+    console.error(`Error fetching GLD:`, error);
+    return null;
   }
-  
-  return null;
 }
 
 // Fetch USD/CNY exchange rate
