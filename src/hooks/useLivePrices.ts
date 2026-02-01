@@ -29,7 +29,7 @@ interface CacheEntry {
 }
 
 let globalPriceCache: CacheEntry | null = null;
-const CACHE_DURATION = 60 * 1000; // 1 minute
+const CACHE_DURATION = 30 * 1000; // 30 seconds - shorter cache for fresher data
 
 // Get source provider based on category
 function getSourceProvider(category: string): string {
