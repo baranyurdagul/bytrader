@@ -38,14 +38,12 @@ const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 
 // Conversion constants
 const GRAMS_PER_TROY_OZ = 31.1035;
-const GLD_OZ_PER_SHARE = 0.091;  // GLD holds ~0.091 oz gold per share
 
-// Fetch COMEX gold price derived from GLD ETF
-// GLD is more reliable than futures contracts for spot price approximation
+// Fetch COMEX gold price directly from futures contract (GC=F)
 async function fetchComexGold(): Promise<{ price: number; change: number; changePercent: number } | null> {
   try {
     const response = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/GLD?interval=1d&range=2d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=2d`,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -54,7 +52,7 @@ async function fetchComexGold(): Promise<{ price: number; change: number; change
     );
     
     if (!response.ok) {
-      console.error(`Yahoo Finance error for GLD:`, response.status);
+      console.error(`Yahoo Finance error for GC=F:`, response.status);
       return null;
     }
     
@@ -62,25 +60,21 @@ async function fetchComexGold(): Promise<{ price: number; change: number; change
     const result = data?.chart?.result?.[0];
     
     if (!result?.meta?.regularMarketPrice) {
-      console.error(`No price data for GLD`);
+      console.error(`No price data for GC=F`);
       return null;
     }
     
     const meta = result.meta;
-    const gldPrice = meta.regularMarketPrice;
-    const gldPrevClose = meta.chartPreviousClose || meta.previousClose || gldPrice;
+    const price = meta.regularMarketPrice;
+    const prevClose = meta.chartPreviousClose || meta.previousClose || price;
     
-    // Derive spot gold price from GLD
-    const price = gldPrice / GLD_OZ_PER_SHARE;
-    const prevPrice = gldPrevClose / GLD_OZ_PER_SHARE;
+    const change = price - prevClose;
+    const changePercent = prevClose ? (change / prevClose) * 100 : 0;
     
-    const change = price - prevPrice;
-    const changePercent = prevPrice ? (change / prevPrice) * 100 : 0;
-    
-    console.log(`COMEX Gold (derived from GLD $${gldPrice.toFixed(2)}): $${price.toFixed(2)}/oz`);
+    console.log(`COMEX Gold (GC=F futures): $${price.toFixed(2)}/oz`);
     return { price, change, changePercent };
   } catch (error) {
-    console.error(`Error fetching GLD:`, error);
+    console.error(`Error fetching GC=F:`, error);
     return null;
   }
 }
