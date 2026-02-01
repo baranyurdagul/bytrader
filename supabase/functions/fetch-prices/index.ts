@@ -91,40 +91,45 @@ async function fetchYahooQuote(ticker: string): Promise<any | null> {
   }
 }
 
-// Fetch metal prices from Yahoo Finance using futures contracts (GC=F, SI=F)
+// Fetch metal prices by deriving spot from GLD and SLV ETFs
+// GLD and SLV are proxies for spot gold/silver - much more reliable than futures
 async function fetchMetalPrices(): Promise<PriceData[]> {
-  console.log('Fetching metal prices via futures (GC=F, SI=F)...');
+  console.log('Fetching metal prices via ETF derivation (GLD, SLV)...');
   
-  const [goldQuote, silverQuote] = await Promise.all([
-    fetchYahooQuote(YAHOO_TICKERS.gold_spot),  // GC=F - Gold Futures
-    fetchYahooQuote(YAHOO_TICKERS.silver_spot), // SI=F - Silver Futures
+  const [gldQuote, slvQuote] = await Promise.all([
+    fetchYahooQuote('GLD'),  // SPDR Gold Trust
+    fetchYahooQuote('SLV'),  // iShares Silver Trust
   ]);
   
   const results: PriceData[] = [];
   const now = new Date().toISOString();
   
-  if (goldQuote?.price) {
-    const change = goldQuote.price - (goldQuote.previousClose || goldQuote.price);
+  // Derive gold spot price from GLD ETF
+  // GLD holds approximately 0.091 oz of gold per share
+  if (gldQuote?.price) {
+    const goldSpot = gldQuote.price / GLD_OZ_PER_SHARE;
+    const prevGoldSpot = gldQuote.previousClose ? gldQuote.previousClose / GLD_OZ_PER_SHARE : goldSpot;
+    const change = goldSpot - prevGoldSpot;
     
     const priceData: PriceData = {
       id: 'gold',
       name: 'Gold',
       symbol: 'XAU/USD',
       category: 'metal',
-      price: goldQuote.price,
+      price: Math.round(goldSpot * 100) / 100,
       priceUnit: '/oz',
-      change,
-      changePercent: goldQuote.previousClose ? (change / goldQuote.previousClose) * 100 : 0,
-      high24h: goldQuote.high || goldQuote.price,
-      low24h: goldQuote.low || goldQuote.price,
-      volume: formatVolume(goldQuote.volume || 125000),
+      change: Math.round(change * 100) / 100,
+      changePercent: prevGoldSpot ? (change / prevGoldSpot) * 100 : 0,
+      high24h: gldQuote.high ? gldQuote.high / GLD_OZ_PER_SHARE : goldSpot,
+      low24h: gldQuote.low ? gldQuote.low / GLD_OZ_PER_SHARE : goldSpot,
+      volume: formatVolume(gldQuote.volume || 125000),
       marketCap: '$15.8T',
       lastUpdated: now,
       dataSource: 'live',
     };
     results.push(priceData);
     priceCache.set('gold', { ...priceData, lastUpdated: now });
-    console.log(`Gold Futures (GC=F): $${goldQuote.price.toFixed(2)}/oz`);
+    console.log(`Gold (derived from GLD $${gldQuote.price.toFixed(2)}): $${goldSpot.toFixed(2)}/oz`);
   } else {
     const cached = priceCache.get('gold');
     if (cached) {
@@ -132,28 +137,32 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
     }
   }
   
-  if (silverQuote?.price) {
-    const change = silverQuote.price - (silverQuote.previousClose || silverQuote.price);
+  // Derive silver spot price from SLV ETF
+  // SLV holds approximately 0.885 oz of silver per share
+  if (slvQuote?.price) {
+    const silverSpot = slvQuote.price / SLV_OZ_PER_SHARE;
+    const prevSilverSpot = slvQuote.previousClose ? slvQuote.previousClose / SLV_OZ_PER_SHARE : silverSpot;
+    const change = silverSpot - prevSilverSpot;
     
     const priceData: PriceData = {
       id: 'silver',
       name: 'Silver',
       symbol: 'XAG/USD',
       category: 'metal',
-      price: silverQuote.price,
+      price: Math.round(silverSpot * 100) / 100,
       priceUnit: '/oz',
-      change,
-      changePercent: silverQuote.previousClose ? (change / silverQuote.previousClose) * 100 : 0,
-      high24h: silverQuote.high || silverQuote.price,
-      low24h: silverQuote.low || silverQuote.price,
-      volume: formatVolume(silverQuote.volume || 89000),
+      change: Math.round(change * 100) / 100,
+      changePercent: prevSilverSpot ? (change / prevSilverSpot) * 100 : 0,
+      high24h: slvQuote.high ? slvQuote.high / SLV_OZ_PER_SHARE : silverSpot,
+      low24h: slvQuote.low ? slvQuote.low / SLV_OZ_PER_SHARE : silverSpot,
+      volume: formatVolume(slvQuote.volume || 89000),
       marketCap: '$1.4T',
       lastUpdated: now,
       dataSource: 'live',
     };
     results.push(priceData);
     priceCache.set('silver', { ...priceData, lastUpdated: now });
-    console.log(`Silver Futures (SI=F): $${silverQuote.price.toFixed(2)}/oz`);
+    console.log(`Silver (derived from SLV $${slvQuote.price.toFixed(2)}): $${silverSpot.toFixed(2)}/oz`);
   } else {
     const cached = priceCache.get('silver');
     if (cached) {

@@ -39,12 +39,14 @@ const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 // Conversion constants
 const GRAMS_PER_TROY_OZ = 31.1035;
 const GRAMS_PER_KG = 1000;
+const SLV_OZ_PER_SHARE = 0.885;  // SLV holds ~0.885 oz silver per share
 
-// Fetch COMEX silver price via Silver Futures (SI=F) from Yahoo Finance
+// Fetch COMEX silver price derived from SLV ETF
+// SLV is more reliable than futures contracts for spot price approximation
 async function fetchComexSilver(): Promise<{ price: number; change: number; changePercent: number } | null> {
   try {
     const response = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/SI=F?interval=1d&range=2d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/SLV?interval=1d&range=2d`,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -53,7 +55,7 @@ async function fetchComexSilver(): Promise<{ price: number; change: number; chan
     );
     
     if (!response.ok) {
-      console.error(`Yahoo Finance error for SI=F:`, response.status);
+      console.error(`Yahoo Finance error for SLV:`, response.status);
       return null;
     }
     
@@ -61,27 +63,25 @@ async function fetchComexSilver(): Promise<{ price: number; change: number; chan
     const result = data?.chart?.result?.[0];
     
     if (!result?.meta?.regularMarketPrice) {
-      console.error(`No price data for SI=F`);
+      console.error(`No price data for SLV`);
       return null;
     }
     
     const meta = result.meta;
-    const price = meta.regularMarketPrice;
-    const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+    const slvPrice = meta.regularMarketPrice;
+    const slvPrevClose = meta.chartPreviousClose || meta.previousClose || slvPrice;
     
-    // Sanity check: silver futures prices should be reasonable (between $20 and $150/oz)
-    if (price < 20 || price > 150) {
-      console.error(`Suspicious silver futures price: $${price.toFixed(2)} - skipping`);
-      return null;
-    }
+    // Derive spot silver price from SLV
+    const price = slvPrice / SLV_OZ_PER_SHARE;
+    const prevPrice = slvPrevClose / SLV_OZ_PER_SHARE;
     
-    const change = price - prevClose;
-    const changePercent = prevClose ? (change / prevClose) * 100 : 0;
+    const change = price - prevPrice;
+    const changePercent = prevPrice ? (change / prevPrice) * 100 : 0;
     
-    console.log(`COMEX Silver Futures (SI=F): $${price.toFixed(2)}/oz`);
+    console.log(`COMEX Silver (derived from SLV $${slvPrice.toFixed(2)}): $${price.toFixed(2)}/oz`);
     return { price, change, changePercent };
   } catch (error) {
-    console.error(`Error fetching SI=F:`, error);
+    console.error(`Error fetching SLV:`, error);
     return null;
   }
 }
