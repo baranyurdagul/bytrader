@@ -39,15 +39,11 @@ const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 // Conversion constants
 const GRAMS_PER_TROY_OZ = 31.1035;
 
-// GLD holds roughly 0.091 oz of gold per share
-// So spot gold = GLD price / 0.091
-const GLD_OZ_PER_SHARE = 0.091;
-
-// Fetch COMEX gold spot price via GLD ETF from Yahoo Finance
+// Fetch COMEX gold price via Gold Futures (GC=F) from Yahoo Finance
 async function fetchComexGold(): Promise<{ price: number; change: number; changePercent: number } | null> {
   try {
     const response = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/GLD?interval=1d&range=2d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=2d`,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -56,7 +52,7 @@ async function fetchComexGold(): Promise<{ price: number; change: number; change
     );
     
     if (!response.ok) {
-      console.error(`Yahoo Finance error for GLD:`, response.status);
+      console.error(`Yahoo Finance error for GC=F:`, response.status);
       return null;
     }
     
@@ -64,31 +60,27 @@ async function fetchComexGold(): Promise<{ price: number; change: number; change
     const result = data?.chart?.result?.[0];
     
     if (!result?.meta?.regularMarketPrice) {
-      console.error(`No price data for GLD`);
+      console.error(`No price data for GC=F`);
       return null;
     }
     
     const meta = result.meta;
-    const gldPrice = meta.regularMarketPrice;
-    const gldPrevClose = meta.chartPreviousClose || meta.previousClose || gldPrice;
+    const price = meta.regularMarketPrice;
+    const prevClose = meta.chartPreviousClose || meta.previousClose || price;
     
-    // Convert GLD ETF price to spot gold price per oz
-    const spotPrice = gldPrice / GLD_OZ_PER_SHARE;
-    const spotPrevClose = gldPrevClose / GLD_OZ_PER_SHARE;
-    
-    // Sanity check: gold prices should be reasonable (between $2000 and $6000/oz)
-    if (spotPrice < 2000 || spotPrice > 6000) {
-      console.error(`Suspicious gold spot price: $${spotPrice.toFixed(2)} - skipping`);
+    // Sanity check: gold futures prices should be reasonable (between $2000 and $6000/oz)
+    if (price < 2000 || price > 6000) {
+      console.error(`Suspicious gold futures price: $${price.toFixed(2)} - skipping`);
       return null;
     }
     
-    const change = spotPrice - spotPrevClose;
-    const changePercent = spotPrevClose ? (change / spotPrevClose) * 100 : 0;
+    const change = price - prevClose;
+    const changePercent = prevClose ? (change / prevClose) * 100 : 0;
     
-    console.log(`COMEX Gold Spot (via GLD): $${spotPrice.toFixed(2)}/oz (GLD: $${gldPrice.toFixed(2)})`);
-    return { price: spotPrice, change, changePercent };
+    console.log(`COMEX Gold Futures (GC=F): $${price.toFixed(2)}/oz`);
+    return { price, change, changePercent };
   } catch (error) {
-    console.error(`Error fetching GLD:`, error);
+    console.error(`Error fetching GC=F:`, error);
     return null;
   }
 }

@@ -40,15 +40,11 @@ const CACHE_DURATION = 60 * 1000; // 1 minute (reduced for fresher data)
 const GRAMS_PER_TROY_OZ = 31.1035;
 const GRAMS_PER_KG = 1000;
 
-// SLV holds roughly 0.885 oz of silver per share
-// So spot silver = SLV price / 0.885
-const SLV_OZ_PER_SHARE = 0.885;
-
-// Fetch COMEX silver spot price via SLV ETF from Yahoo Finance
+// Fetch COMEX silver price via Silver Futures (SI=F) from Yahoo Finance
 async function fetchComexSilver(): Promise<{ price: number; change: number; changePercent: number } | null> {
   try {
     const response = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/SLV?interval=1d&range=2d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/SI=F?interval=1d&range=2d`,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -57,7 +53,7 @@ async function fetchComexSilver(): Promise<{ price: number; change: number; chan
     );
     
     if (!response.ok) {
-      console.error(`Yahoo Finance error for SLV:`, response.status);
+      console.error(`Yahoo Finance error for SI=F:`, response.status);
       return null;
     }
     
@@ -65,31 +61,27 @@ async function fetchComexSilver(): Promise<{ price: number; change: number; chan
     const result = data?.chart?.result?.[0];
     
     if (!result?.meta?.regularMarketPrice) {
-      console.error(`No price data for SLV`);
+      console.error(`No price data for SI=F`);
       return null;
     }
     
     const meta = result.meta;
-    const slvPrice = meta.regularMarketPrice;
-    const slvPrevClose = meta.chartPreviousClose || meta.previousClose || slvPrice;
+    const price = meta.regularMarketPrice;
+    const prevClose = meta.chartPreviousClose || meta.previousClose || price;
     
-    // Convert SLV ETF price to spot silver price per oz
-    const spotPrice = slvPrice / SLV_OZ_PER_SHARE;
-    const spotPrevClose = slvPrevClose / SLV_OZ_PER_SHARE;
-    
-    // Sanity check: silver prices should be reasonable (between $20 and $100/oz)
-    if (spotPrice < 20 || spotPrice > 100) {
-      console.error(`Suspicious silver spot price: $${spotPrice.toFixed(2)} - skipping`);
+    // Sanity check: silver futures prices should be reasonable (between $20 and $150/oz)
+    if (price < 20 || price > 150) {
+      console.error(`Suspicious silver futures price: $${price.toFixed(2)} - skipping`);
       return null;
     }
     
-    const change = spotPrice - spotPrevClose;
-    const changePercent = spotPrevClose ? (change / spotPrevClose) * 100 : 0;
+    const change = price - prevClose;
+    const changePercent = prevClose ? (change / prevClose) * 100 : 0;
     
-    console.log(`COMEX Silver Spot (via SLV): $${spotPrice.toFixed(2)}/oz (SLV: $${slvPrice.toFixed(2)})`);
-    return { price: spotPrice, change, changePercent };
+    console.log(`COMEX Silver Futures (SI=F): $${price.toFixed(2)}/oz`);
+    return { price, change, changePercent };
   } catch (error) {
-    console.error(`Error fetching SLV:`, error);
+    console.error(`Error fetching SI=F:`, error);
     return null;
   }
 }
