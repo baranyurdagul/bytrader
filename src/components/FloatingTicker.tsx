@@ -14,7 +14,7 @@ export function FloatingTicker({ commodities }: FloatingTickerProps) {
   const tickerItems = [...commodities, ...commodities];
   
   return (
-    <div className="fixed top-14 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border overflow-hidden">
+    <div className="bg-background/95 backdrop-blur-sm border-b border-border overflow-hidden">
       <div className="flex animate-scroll">
         {tickerItems.map((commodity, index) => {
           const isPositive = commodity.change >= 0;
@@ -22,7 +22,10 @@ export function FloatingTicker({ commodities }: FloatingTickerProps) {
           return (
             <button
               key={`${commodity.id}-${index}`}
-              onClick={() => navigate(`/asset/${commodity.id}`)}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/asset/${commodity.id}`);
+              }}
               className="flex items-center gap-2 px-4 py-2 border-r border-border/50 hover:bg-card/50 transition-colors whitespace-nowrap min-w-max"
             >
               <span className="font-medium text-foreground text-sm">{commodity.symbol}</span>

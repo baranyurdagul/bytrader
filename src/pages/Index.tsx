@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { CommodityCard, PriceUnit } from '@/components/CommodityCard';
 import { CompactAssetRow } from '@/components/CompactAssetRow';
-import { FloatingTicker } from '@/components/FloatingTicker';
 import { MarketOverview } from '@/components/MarketOverview';
 import { AddAlertDialog } from '@/components/AddAlertDialog';
 import { AlertsList } from '@/components/AlertsList';
@@ -88,10 +87,7 @@ const Index = () => {
 
   return (
     <Layout>
-      {/* Floating Ticker */}
-      <FloatingTicker commodities={commodities} />
-      
-      <main className="container mx-auto px-4 py-6 pt-16">
+      <main className="container mx-auto px-4 py-6">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
