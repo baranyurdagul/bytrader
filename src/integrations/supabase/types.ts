@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      arbitrage_snapshots: {
+        Row: {
+          created_at: string
+          gold_comex_price: number
+          gold_shanghai_price: number
+          gold_spread_percent: number
+          id: string
+          silver_comex_price: number
+          silver_shanghai_price: number
+          silver_spread_percent: number
+          snapshot_date: string
+          usd_cny_rate: number
+        }
+        Insert: {
+          created_at?: string
+          gold_comex_price: number
+          gold_shanghai_price: number
+          gold_spread_percent: number
+          id?: string
+          silver_comex_price: number
+          silver_shanghai_price: number
+          silver_spread_percent: number
+          snapshot_date: string
+          usd_cny_rate: number
+        }
+        Update: {
+          created_at?: string
+          gold_comex_price?: number
+          gold_shanghai_price?: number
+          gold_spread_percent?: number
+          id?: string
+          silver_comex_price?: number
+          silver_shanghai_price?: number
+          silver_spread_percent?: number
+          snapshot_date?: string
+          usd_cny_rate?: number
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
