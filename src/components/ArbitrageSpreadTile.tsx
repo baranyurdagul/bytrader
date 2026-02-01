@@ -1,6 +1,6 @@
 import { useGoldSpread } from '@/hooks/useGoldSpread';
 import { useSilverSpread } from '@/hooks/useSilverSpread';
-import { RefreshCw, TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ChevronRight, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -182,9 +182,18 @@ export function ArbitrageSpreadTile() {
           </div>
         </div>
         
-        <p className="text-[10px] text-muted-foreground mt-3 text-center">
-          Tap for trends • {goldData?.shanghai?.session || silverData?.shanghai?.session || 'PM'} session
-        </p>
+        <div className="flex items-center justify-center gap-1.5 mt-3 text-[10px] text-muted-foreground">
+          <Clock className="w-3 h-3" />
+          <span>
+            {goldData?.lastUpdated 
+              ? new Date(goldData.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : '--:--'}
+          </span>
+          <span>•</span>
+          <span>{goldData?.shanghai?.session || silverData?.shanghai?.session || 'PM'} session</span>
+          <span>•</span>
+          <span>Tap for trends</span>
+        </div>
       </div>
     </div>
   );
