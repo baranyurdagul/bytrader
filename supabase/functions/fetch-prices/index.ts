@@ -91,35 +91,32 @@ async function fetchYahooQuote(ticker: string): Promise<any | null> {
   }
 }
 
-// Fetch metal prices from Yahoo Finance using ETFs (converted to spot prices)
+// Fetch metal prices from Yahoo Finance using futures contracts (GC=F, SI=F)
 async function fetchMetalPrices(): Promise<PriceData[]> {
-  console.log('Fetching metal spot prices via ETFs (GLD, SLV)...');
+  console.log('Fetching metal prices via futures (GC=F, SI=F)...');
   
   const [goldQuote, silverQuote] = await Promise.all([
-    fetchYahooQuote(YAHOO_TICKERS.gld),
-    fetchYahooQuote(YAHOO_TICKERS.slv),
+    fetchYahooQuote(YAHOO_TICKERS.gold_spot),  // GC=F - Gold Futures
+    fetchYahooQuote(YAHOO_TICKERS.silver_spot), // SI=F - Silver Futures
   ]);
   
   const results: PriceData[] = [];
   const now = new Date().toISOString();
   
   if (goldQuote?.price) {
-    // GLD holds ~0.0925 oz per share, so divide price by oz to get spot price
-    const spotGoldPrice = goldQuote.price / GLD_OZ_PER_SHARE;
-    const spotPrevClose = (goldQuote.previousClose || goldQuote.price) / GLD_OZ_PER_SHARE;
-    const change = spotGoldPrice - spotPrevClose;
+    const change = goldQuote.price - (goldQuote.previousClose || goldQuote.price);
     
     const priceData: PriceData = {
       id: 'gold',
       name: 'Gold',
       symbol: 'XAU/USD',
       category: 'metal',
-      price: spotGoldPrice,
+      price: goldQuote.price,
       priceUnit: '/oz',
       change,
-      changePercent: spotPrevClose ? (change / spotPrevClose) * 100 : 0,
-      high24h: (goldQuote.high || goldQuote.price) / GLD_OZ_PER_SHARE,
-      low24h: (goldQuote.low || goldQuote.price) / GLD_OZ_PER_SHARE,
+      changePercent: goldQuote.previousClose ? (change / goldQuote.previousClose) * 100 : 0,
+      high24h: goldQuote.high || goldQuote.price,
+      low24h: goldQuote.low || goldQuote.price,
       volume: formatVolume(goldQuote.volume || 125000),
       marketCap: '$15.8T',
       lastUpdated: now,
@@ -127,7 +124,7 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
     };
     results.push(priceData);
     priceCache.set('gold', { ...priceData, lastUpdated: now });
-    console.log(`Gold Spot (via GLD): $${spotGoldPrice.toFixed(2)}/oz (GLD: $${goldQuote.price.toFixed(2)})`);
+    console.log(`Gold Futures (GC=F): $${goldQuote.price.toFixed(2)}/oz`);
   } else {
     const cached = priceCache.get('gold');
     if (cached) {
@@ -136,22 +133,19 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
   }
   
   if (silverQuote?.price) {
-    // SLV holds ~0.92 oz per share, so divide price by oz to get spot price
-    const spotSilverPrice = silverQuote.price / SLV_OZ_PER_SHARE;
-    const spotPrevClose = (silverQuote.previousClose || silverQuote.price) / SLV_OZ_PER_SHARE;
-    const change = spotSilverPrice - spotPrevClose;
+    const change = silverQuote.price - (silverQuote.previousClose || silverQuote.price);
     
     const priceData: PriceData = {
       id: 'silver',
       name: 'Silver',
       symbol: 'XAG/USD',
       category: 'metal',
-      price: spotSilverPrice,
+      price: silverQuote.price,
       priceUnit: '/oz',
       change,
-      changePercent: spotPrevClose ? (change / spotPrevClose) * 100 : 0,
-      high24h: (silverQuote.high || silverQuote.price) / SLV_OZ_PER_SHARE,
-      low24h: (silverQuote.low || silverQuote.price) / SLV_OZ_PER_SHARE,
+      changePercent: silverQuote.previousClose ? (change / silverQuote.previousClose) * 100 : 0,
+      high24h: silverQuote.high || silverQuote.price,
+      low24h: silverQuote.low || silverQuote.price,
       volume: formatVolume(silverQuote.volume || 89000),
       marketCap: '$1.4T',
       lastUpdated: now,
@@ -159,7 +153,7 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
     };
     results.push(priceData);
     priceCache.set('silver', { ...priceData, lastUpdated: now });
-    console.log(`Silver Spot (via SLV): $${spotSilverPrice.toFixed(2)}/oz (SLV: $${silverQuote.price.toFixed(2)})`);
+    console.log(`Silver Futures (SI=F): $${silverQuote.price.toFixed(2)}/oz`);
   } else {
     const cached = priceCache.get('silver');
     if (cached) {
