@@ -256,6 +256,35 @@ export function useLivePrices(refreshInterval: number = 60000) {
     return () => clearInterval(intervalId);
   }, [fetchPrices, refreshInterval]);
 
+  const forceRefresh = useCallback(async () => {
+    // Clear global cache
+    globalPriceCache = null;
+    setIsLoading(true);
+    
+    // Clear service worker cache for API responses
+    if ('caches' in window) {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        );
+        console.log('Cleared all browser caches');
+      } catch (e) {
+        console.warn('Failed to clear caches:', e);
+      }
+    }
+    
+    // Force service worker update
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+    }
+    
+    // Wait a moment for cache clear to propagate
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    fetchPrices();
+  }, [fetchPrices]);
+
   const refetch = useCallback(() => {
     // Clear cache to force fresh fetch
     globalPriceCache = null;
@@ -270,5 +299,6 @@ export function useLivePrices(refreshInterval: number = 60000) {
     lastUpdated,
     dataFreshness,
     refetch,
+    forceRefresh,
   };
 }
