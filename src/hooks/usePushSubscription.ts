@@ -73,27 +73,22 @@ export function usePushSubscription() {
       const p256dh = arrayBufferToBase64Url(p256dhKey);
       const auth = arrayBufferToBase64Url(authKey);
 
-      // Save to database (upsert)
-      const { error } = await supabase
-        .from('push_subscriptions')
-        .upsert(
-          {
-            user_id: user.id,
-            endpoint,
-            p256dh,
-            auth,
-          } as any,
-          { 
-            onConflict: 'user_id,endpoint',
-          }
-        );
+      // Save via secure edge function (not direct database access)
+      const { data, error } = await supabase.functions.invoke('manage-push-subscription', {
+        body: {
+          action: 'subscribe',
+          endpoint,
+          p256dh,
+          auth,
+        },
+      });
 
-      if (error) {
-        console.error('Error saving push subscription:', error);
+      if (error || !data?.success) {
+        console.error('Error saving push subscription:', error || data?.error);
         return false;
       }
 
-      console.log('Push subscription saved successfully');
+      console.log('Push subscription saved successfully via edge function');
       return true;
     } catch (error) {
       console.error('Error subscribing to push:', error);
@@ -111,12 +106,13 @@ export function usePushSubscription() {
       const pushSubscription = await registration.pushManager.getSubscription();
 
       if (pushSubscription) {
-        // Remove from database
-        await supabase
-          .from('push_subscriptions')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('endpoint', pushSubscription.endpoint);
+        // Remove via secure edge function
+        await supabase.functions.invoke('manage-push-subscription', {
+          body: {
+            action: 'unsubscribe',
+            endpoint: pushSubscription.endpoint,
+          },
+        });
 
         // Unsubscribe from push
         await pushSubscription.unsubscribe();
