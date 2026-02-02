@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, TrendingUp, TrendingDown, Minus, RefreshCw, Clock, Globe, BarChart3 } from 'lucide-react';
+import { Info, TrendingUp, TrendingDown, Minus, RefreshCw, Clock, Globe, BarChart3, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,39 +17,68 @@ import { useSilverSpread, SilverSpreadData } from '@/hooks/useSilverSpread';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { cn } from '@/lib/utils';
 
-// Market session times (UTC)
+// Market session times (UTC) - approximate main trading hours
 const MARKET_SESSIONS = {
-  asia: { open: 1, close: 8, label: 'Asian Session (Shanghai/Tokyo)' },
-  europe: { open: 7, close: 16, label: 'European Session (London)' },
-  us: { open: 13, close: 21, label: 'US Session (NY)' },
+  china: { 
+    open: 1.5, // 9:30 AM CST = 1:30 UTC
+    close: 7.5, // 3:30 PM CST = 7:30 UTC  
+    label: 'China Market',
+    flag: '🇨🇳',
+    timezone: 'CST (UTC+8)'
+  },
+  us: { 
+    open: 14.5, // 9:30 AM EST = 14:30 UTC
+    close: 21, // 4:00 PM EST = 21:00 UTC
+    label: 'US Market',
+    flag: '🇺🇸',
+    timezone: 'EST (UTC-5)'
+  },
 };
 
-function getCurrentSession(): { session: string; label: string; isOpen: boolean } {
+interface MarketStatus {
+  isOpen: boolean;
+  label: string;
+  flag: string;
+  nextEvent: string;
+  localTime: string;
+  hoursOpen?: number;
+}
+
+function getMarketStatus(market: 'china' | 'us'): MarketStatus {
   const now = new Date();
-  const utcHour = now.getUTCHours();
+  const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
+  const session = MARKET_SESSIONS[market];
   
-  if (utcHour >= MARKET_SESSIONS.us.open && utcHour < MARKET_SESSIONS.us.close) {
-    return { session: 'us', label: 'US Market', isOpen: true };
-  }
-  if (utcHour >= MARKET_SESSIONS.europe.open && utcHour < MARKET_SESSIONS.europe.close) {
-    return { session: 'europe', label: 'European Market', isOpen: true };
-  }
-  if (utcHour >= MARKET_SESSIONS.asia.open && utcHour < MARKET_SESSIONS.asia.close) {
-    return { session: 'asia', label: 'Asian Market', isOpen: true };
+  const isOpen = utcHour >= session.open && utcHour < session.close;
+  
+  // Calculate next event
+  let nextEvent = '';
+  let hoursOpen = 0;
+  
+  if (isOpen) {
+    hoursOpen = utcHour - session.open;
+    const hoursToClose = session.close - utcHour;
+    if (hoursToClose < 1) {
+      nextEvent = `Closes in ${Math.round(hoursToClose * 60)}m`;
+    } else {
+      nextEvent = `Closes in ${Math.floor(hoursToClose)}h ${Math.round((hoursToClose % 1) * 60)}m`;
+    }
+  } else {
+    let hoursToOpen = session.open - utcHour;
+    if (hoursToOpen < 0) hoursToOpen += 24;
+    if (hoursToOpen < 1) {
+      nextEvent = `Opens in ${Math.round(hoursToOpen * 60)}m`;
+    } else {
+      nextEvent = `Opens in ${Math.floor(hoursToOpen)}h`;
+    }
   }
   
-  // Determine next session
-  if (utcHour < MARKET_SESSIONS.asia.open) {
-    return { session: 'pre-asia', label: 'Pre-Asian Session', isOpen: false };
-  }
-  if (utcHour >= MARKET_SESSIONS.asia.close && utcHour < MARKET_SESSIONS.europe.open) {
-    return { session: 'asia-europe', label: 'Asia → Europe Transition', isOpen: true };
-  }
-  if (utcHour >= MARKET_SESSIONS.us.close) {
-    return { session: 'post-us', label: 'Post-US Session', isOpen: false };
-  }
+  // Get local time for that market
+  const localTime = market === 'china' 
+    ? now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: true })
+    : now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: true });
   
-  return { session: 'unknown', label: 'Market Transition', isOpen: true };
+  return { isOpen, label: session.label, flag: session.flag, nextEvent, localTime, hoursOpen };
 }
 
 function formatPrice(price: number, decimals: number = 2): string {
@@ -72,6 +101,42 @@ function TrendIndicator({ value }: { value: number }) {
     return <TrendingDown className="w-4 h-4 text-destructive" />;
   }
   return <Minus className="w-4 h-4 text-muted-foreground" />;
+}
+
+function MarketStatusCard({ market }: { market: 'china' | 'us' }) {
+  const status = getMarketStatus(market);
+  
+  return (
+    <Card className={cn(
+      "bg-card/50 flex-1",
+      status.isOpen ? "border-success/30" : "border-muted"
+    )}>
+      <CardContent className="p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{status.flag}</span>
+            <span className="font-semibold text-sm">{status.label}</span>
+          </div>
+          <Badge 
+            variant={status.isOpen ? "default" : "secondary"}
+            className={cn("text-xs", status.isOpen && "bg-success text-success-foreground")}
+          >
+            {status.isOpen ? 'OPEN' : 'CLOSED'}
+          </Badge>
+        </div>
+        <div className="text-xs text-muted-foreground space-y-1">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            <span>Local: {status.localTime}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {status.isOpen ? <Sun className="w-3 h-3 text-amber-500" /> : <Moon className="w-3 h-3" />}
+            <span>{status.nextEvent}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function PremiumCard({ 
@@ -131,7 +196,7 @@ function PremiumCard({
         
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
-            <p className="text-muted-foreground text-xs">COMEX</p>
+            <p className="text-muted-foreground text-xs">COMEX 🇺🇸</p>
             <p className="font-mono font-semibold">${formatPrice(data.comex.price)}</p>
             <p className={cn(
               "text-xs",
@@ -141,7 +206,7 @@ function PremiumCard({
             </p>
           </div>
           <div>
-            <p className="text-muted-foreground text-xs">Shanghai (SGE)</p>
+            <p className="text-muted-foreground text-xs">Shanghai 🇨🇳</p>
             <p className="font-mono font-semibold">${formatPrice(data.shanghai.priceUSD)}</p>
             <p className="text-xs text-muted-foreground">
               {metalType === 'gold' ? `¥${formatPrice(data.shanghai.priceCNY)}/g` : `¥${formatPrice(data.shanghai.priceCNY, 0)}/kg`}
@@ -153,7 +218,7 @@ function PremiumCard({
         
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-muted-foreground text-xs">Premium/Discount</p>
+            <p className="text-muted-foreground text-xs">Shanghai Premium</p>
             <div className="flex items-center gap-2">
               <TrendIndicator value={data.spread.percent} />
               <span className={cn(
@@ -169,7 +234,7 @@ function PremiumCard({
             </div>
           </div>
           <div className="text-right">
-            <p className="text-muted-foreground text-xs">Session</p>
+            <p className="text-muted-foreground text-xs">SGE Session</p>
             <Badge variant="outline" className="text-xs">
               {data.shanghai.session}
             </Badge>
@@ -188,110 +253,121 @@ function PremiumCard({
   );
 }
 
-function CryptoPerformanceCard({ 
-  commodities 
+function SessionMovementCard({ 
+  commodities,
+  goldData,
+  silverData
 }: { 
   commodities: Array<{ id: string; name: string; symbol: string; price: number; change: number; changePercent: number }>;
+  goldData: GoldSpreadData | null;
+  silverData: SilverSpreadData | null;
 }) {
+  const chinaStatus = getMarketStatus('china');
+  const usStatus = getMarketStatus('us');
+  
   const btc = commodities.find(c => c.id === 'bitcoin');
   const eth = commodities.find(c => c.id === 'ethereum');
-  
-  const cryptos = [btc, eth].filter(Boolean);
-  
-  if (cryptos.length === 0) {
-    return (
-      <Card className="bg-card/50">
-        <CardContent className="p-4">
-          <p className="text-sm text-muted-foreground">Crypto data unavailable</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const gold = commodities.find(c => c.id === 'gold');
+  const silver = commodities.find(c => c.id === 'silver');
+
+  // Session insights based on which markets are open
+  const getSessionInsight = () => {
+    if (chinaStatus.isOpen && !usStatus.isOpen) {
+      return {
+        title: "After China Market Opening",
+        subtitle: "Asian session in progress, US markets closed",
+        icon: "🇨🇳"
+      };
+    } else if (usStatus.isOpen && !chinaStatus.isOpen) {
+      return {
+        title: "After US Market Opening", 
+        subtitle: "US session in progress, China markets closed",
+        icon: "🇺🇸"
+      };
+    } else if (chinaStatus.isOpen && usStatus.isOpen) {
+      return {
+        title: "China & US Markets Overlap",
+        subtitle: "Both major markets currently active",
+        icon: "🌍"
+      };
+    } else {
+      return {
+        title: "Markets Transition Period",
+        subtitle: "Between major trading sessions",
+        icon: "🌙"
+      };
+    }
+  };
+
+  const sessionInfo = getSessionInsight();
+
+  const assets = [
+    { id: 'gold', name: 'Gold', symbol: 'XAU', data: gold, changePercent: goldData?.comex.changePercent ?? gold?.changePercent ?? 0 },
+    { id: 'silver', name: 'Silver', symbol: 'XAG', data: silver, changePercent: silverData?.comex.changePercent ?? silver?.changePercent ?? 0 },
+    { id: 'btc', name: 'Bitcoin', symbol: 'BTC', data: btc, changePercent: btc?.changePercent ?? 0 },
+    { id: 'eth', name: 'Ethereum', symbol: 'ETH', data: eth, changePercent: eth?.changePercent ?? 0 },
+  ];
 
   return (
     <Card className="bg-card/50">
       <CardHeader className="pb-2 pt-4 px-4">
         <CardTitle className="text-sm flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-primary" />
-          Crypto Performance (24h)
+          <span className="text-lg">{sessionInfo.icon}</span>
+          <div>
+            <div>{sessionInfo.title}</div>
+            <div className="text-xs font-normal text-muted-foreground">{sessionInfo.subtitle}</div>
+          </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-4 pt-0 space-y-3">
-        {cryptos.map(crypto => crypto && (
-          <div key={crypto.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+      <CardContent className="p-4 pt-0 space-y-2">
+        {assets.map(asset => (
+          <div key={asset.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">{crypto.symbol}</span>
-              <span className="text-xs text-muted-foreground">{crypto.name}</span>
+              <span className="font-semibold text-sm">{asset.symbol}</span>
+              <span className="text-xs text-muted-foreground">{asset.name}</span>
             </div>
-            <div className="text-right">
-              <p className="font-mono font-semibold">${formatPrice(crypto.price)}</p>
-              <div className="flex items-center gap-1 justify-end">
-                <TrendIndicator value={crypto.changePercent} />
-                <span className={cn(
-                  "text-sm font-mono",
-                  crypto.changePercent >= 0 ? "text-success" : "text-destructive"
-                )}>
-                  {formatPercent(crypto.changePercent)}
-                </span>
-              </div>
+            <div className="flex items-center gap-2">
+              <TrendIndicator value={asset.changePercent} />
+              <span className={cn(
+                "text-sm font-mono font-semibold",
+                asset.changePercent >= 0 ? "text-success" : "text-destructive"
+              )}>
+                {formatPercent(asset.changePercent)}
+              </span>
             </div>
           </div>
         ))}
         
-        <div className="pt-2 text-xs text-muted-foreground">
-          <p className="flex items-center gap-1">
-            <Globe className="w-3 h-3" />
-            Crypto markets operate 24/7 globally
-          </p>
+        <div className="pt-3 space-y-2 text-xs">
+          {chinaStatus.isOpen && (
+            <div className="flex items-center gap-2 p-2 rounded bg-amber-500/10 border border-amber-500/20">
+              <span>🇨🇳</span>
+              <span className="text-amber-600 dark:text-amber-400">
+                China market open for {chinaStatus.hoursOpen?.toFixed(1)}h — {chinaStatus.nextEvent}
+              </span>
+            </div>
+          )}
+          {usStatus.isOpen && (
+            <div className="flex items-center gap-2 p-2 rounded bg-blue-500/10 border border-blue-500/20">
+              <span>🇺🇸</span>
+              <span className="text-blue-600 dark:text-blue-400">
+                US market open for {usStatus.hoursOpen?.toFixed(1)}h — {usStatus.nextEvent}
+              </span>
+            </div>
+          )}
+          {!chinaStatus.isOpen && !usStatus.isOpen && (
+            <div className="flex items-center gap-2 p-2 rounded bg-muted">
+              <span>🌙</span>
+              <span className="text-muted-foreground">
+                Major markets closed. China {chinaStatus.nextEvent.toLowerCase()}, US {usStatus.nextEvent.toLowerCase()}
+              </span>
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function MetalPerformanceCard({ 
-  commodities 
-}: { 
-  commodities: Array<{ id: string; name: string; symbol: string; price: number; change: number; changePercent: number }>;
-}) {
-  const gold = commodities.find(c => c.id === 'gold');
-  const silver = commodities.find(c => c.id === 'silver');
-  
-  const metals = [gold, silver].filter(Boolean);
-  
-  if (metals.length === 0) {
-    return null;
-  }
-
-  return (
-    <Card className="bg-card/50">
-      <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-primary" />
-          Precious Metals Performance (24h)
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 pt-0 space-y-3">
-        {metals.map(metal => metal && (
-          <div key={metal.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">{metal.symbol}</span>
-              <span className="text-xs text-muted-foreground">{metal.name}</span>
-            </div>
-            <div className="text-right">
-              <p className="font-mono font-semibold">${formatPrice(metal.price)}</p>
-              <div className="flex items-center gap-1 justify-end">
-                <TrendIndicator value={metal.changePercent} />
-                <span className={cn(
-                  "text-sm font-mono",
-                  metal.changePercent >= 0 ? "text-success" : "text-destructive"
-                )}>
-                  {formatPercent(metal.changePercent)}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
+        
+        <div className="pt-2 text-[11px] text-muted-foreground">
+          <p>💡 24h change shown. Crypto trades 24/7; metals follow exchange hours.</p>
+        </div>
       </CardContent>
     </Card>
   );
@@ -303,7 +379,6 @@ export function MarketInsightsDialog() {
   const { data: silverData, isLoading: silverLoading, refetch: refetchSilver } = useSilverSpread();
   const { commodities, isLoading: pricesLoading, refetch: refetchPrices } = useLivePrices(60000);
   
-  const currentSession = getCurrentSession();
   const isRefreshing = goldLoading || silverLoading || pricesLoading;
 
   const handleRefresh = () => {
@@ -346,32 +421,19 @@ export function MarketInsightsDialog() {
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Current Market Session */}
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="font-semibold text-sm">{currentSession.label}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date().toLocaleString('en-US', { 
-                        weekday: 'short', 
-                        month: 'short', 
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZoneName: 'short'
-                      })}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant={currentSession.isOpen ? "default" : "secondary"}>
-                  {currentSession.isOpen ? 'ACTIVE' : 'CLOSED'}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Market Status - China & US */}
+          <div>
+            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Globe className="w-4 h-4 text-primary" />
+              Market Status
+            </h3>
+            <div className="flex gap-3">
+              <MarketStatusCard market="china" />
+              <MarketStatusCard market="us" />
+            </div>
+          </div>
+
+          <Separator />
 
           {/* Shanghai vs COMEX Premiums */}
           <div>
@@ -397,24 +459,17 @@ export function MarketInsightsDialog() {
 
           <Separator />
 
-          {/* Metals Performance */}
+          {/* Session-Based Movement */}
           <div>
             <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              Precious Metals Movement
+              <BarChart3 className="w-4 h-4 text-primary" />
+              Session Movement
             </h3>
-            <MetalPerformanceCard commodities={commodities} />
-          </div>
-
-          <Separator />
-
-          {/* Crypto Performance */}
-          <div>
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              Crypto Movement (BTC & ETH)
-            </h3>
-            <CryptoPerformanceCard commodities={commodities} />
+            <SessionMovementCard 
+              commodities={commodities}
+              goldData={goldData}
+              silverData={silverData}
+            />
           </div>
 
           {/* Data Sources */}
