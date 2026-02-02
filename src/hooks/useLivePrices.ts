@@ -257,33 +257,52 @@ export function useLivePrices(refreshInterval: number = 60000) {
   }, [fetchPrices, refreshInterval]);
 
   const forceRefresh = useCallback(async () => {
-    // Clear global cache
+    console.log('[ForceRefresh] Starting complete cache clear...');
+    
+    // Clear global in-memory cache
     globalPriceCache = null;
     setIsLoading(true);
     
-    // Clear service worker cache for API responses
-    if ('caches' in window) {
-      try {
+    try {
+      // 1. Clear ALL browser caches (Cache API)
+      if ('caches' in window) {
         const cacheNames = await caches.keys();
-        await Promise.all(
-          cacheNames.map(cacheName => caches.delete(cacheName))
-        );
-        console.log('Cleared all browser caches');
-      } catch (e) {
-        console.warn('Failed to clear caches:', e);
+        console.log('[ForceRefresh] Clearing caches:', cacheNames);
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
       }
+      
+      // 2. Unregister ALL service workers and re-register
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        console.log('[ForceRefresh] Unregistering service workers:', registrations.length);
+        await Promise.all(registrations.map(reg => reg.unregister()));
+      }
+      
+      // 3. Clear localStorage and sessionStorage price data
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('price') || key.includes('cache') || key.includes('supabase'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      sessionStorage.clear();
+      console.log('[ForceRefresh] Cleared storage, removed keys:', keysToRemove);
+      
+      // 4. Wait for cleanup to complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // 5. Force a complete page reload to bypass all caching
+      console.log('[ForceRefresh] Triggering hard reload...');
+      window.location.reload();
+      
+    } catch (e) {
+      console.error('[ForceRefresh] Error during cache clear:', e);
+      // Fallback: just reload
+      window.location.reload();
     }
-    
-    // Force service worker update
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
-    }
-    
-    // Wait a moment for cache clear to propagate
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    fetchPrices();
-  }, [fetchPrices]);
+  }, []);
 
   const refetch = useCallback(() => {
     // Clear cache to force fresh fetch

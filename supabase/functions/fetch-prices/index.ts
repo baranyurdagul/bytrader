@@ -1,3 +1,6 @@
+// Version for deployment verification - update on each deploy
+const VERSION = "v2.1.0";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -367,13 +370,15 @@ function formatMarketCap(marketCap: number): string {
 }
 
 Deno.serve(async (req) => {
+  console.log(`[${VERSION}] Request received at ${new Date().toISOString()}`);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Fetching live prices from Yahoo Finance + CoinGecko...');
+    console.log(`[${VERSION}] Fetching live prices from Yahoo Finance + CoinGecko...`);
     
     // Fetch all prices in parallel
     const [metals, etfs, cryptos, indices] = await Promise.all([
@@ -405,6 +410,8 @@ Deno.serve(async (req) => {
       );
     }
     
+    console.log(`[${VERSION}] Returning ${allPrices.length} prices`);
+    
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -412,7 +419,8 @@ Deno.serve(async (req) => {
         meta: {
           liveCount,
           cachedCount,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          version: VERSION,
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
