@@ -67,10 +67,12 @@ export function Header() {
     }
   };
 
+  const isMarketsPage = location.pathname === '/';
+
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50 safe-area-top">
-      {/* Scrolling Ticker at the very top */}
-      <FloatingTicker commodities={commodities} />
+      {/* Scrolling Ticker - only on Markets page */}
+      {isMarketsPage && <FloatingTicker commodities={commodities} />}
       
       <div className="container mx-auto px-4 py-3 md:py-4">
         <div className="flex items-center justify-between">
@@ -221,12 +223,14 @@ export function Header() {
         </div>
       </div>
       
-      {/* Arbitrage Spread Tile Section */}
-      <div className="border-t border-border/50 bg-background/50">
-        <div className="container mx-auto px-4 py-3">
-          <ArbitrageSpreadTile />
+      {/* Arbitrage Spread Tile Section - only on Markets page */}
+      {isMarketsPage && (
+        <div className="border-t border-border/50 bg-background/50">
+          <div className="container mx-auto px-4 py-3">
+            <ArbitrageSpreadTile />
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }
