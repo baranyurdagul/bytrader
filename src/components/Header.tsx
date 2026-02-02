@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Bell, Settings, Coins, Wallet, User, LogOut, LogIn, RefreshCw, Calculator } from 'lucide-react';
+import { Activity, Bell, Settings, Coins, Wallet, User, LogOut, LogIn, RefreshCw, Calculator, Info } from 'lucide-react';
+import { MarketInsightsDialog } from '@/components/MarketInsightsDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import {
@@ -164,6 +165,9 @@ export function Header() {
               <Activity className="w-4 h-4 text-success animate-pulse" />
               <span className="text-xs font-medium text-success">Markets Open</span>
             </div>
+            
+            {/* Market Insights Button */}
+            <MarketInsightsDialog />
             
             <Link 
               to="/alerts"
