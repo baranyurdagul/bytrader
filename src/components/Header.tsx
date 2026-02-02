@@ -16,6 +16,10 @@ import { ArbitrageSpreadTile } from '@/components/ArbitrageSpreadTile';
 import { FloatingTicker } from '@/components/FloatingTicker';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { getCommodityData } from '@/lib/tradingData';
+import { Badge } from '@/components/ui/badge';
+
+// Frontend app version - update this when deploying new versions
+const APP_VERSION = "v2.1.0";
 
 export function Header() {
   const location = useLocation();
@@ -147,6 +151,14 @@ export function Header() {
                 isRefreshing && "animate-spin"
               )} />
             </Button>
+            
+            {/* Version Badge */}
+            <Badge 
+              variant="outline" 
+              className="hidden xs:flex text-[10px] px-2 py-0.5 font-mono bg-muted/50 border-border text-muted-foreground"
+            >
+              {APP_VERSION}
+            </Badge>
             
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/20">
               <Activity className="w-4 h-4 text-success animate-pulse" />
