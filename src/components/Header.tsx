@@ -19,7 +19,7 @@ import { getCommodityData } from '@/lib/tradingData';
 import { Badge } from '@/components/ui/badge';
 
 // Frontend app version - update this when deploying new versions
-const APP_VERSION = "v2.1.0";
+const APP_VERSION = "v2.2.0";
 
 export function Header() {
   const location = useLocation();
@@ -152,10 +152,10 @@ export function Header() {
               )} />
             </Button>
             
-            {/* Version Badge */}
+            {/* Version Badge - Always visible */}
             <Badge 
               variant="outline" 
-              className="hidden xs:flex text-[10px] px-2 py-0.5 font-mono bg-muted/50 border-border text-muted-foreground"
+              className="text-[10px] px-2 py-0.5 font-mono bg-primary/10 border-primary/30 text-primary font-bold"
             >
               {APP_VERSION}
             </Badge>
