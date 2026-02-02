@@ -253,6 +253,26 @@ function PremiumCard({
   );
 }
 
+function AssetRow({ symbol, name, changePercent }: { symbol: string; name: string; changePercent: number }) {
+  return (
+    <div className="flex items-center justify-between py-1.5">
+      <div className="flex items-center gap-2">
+        <span className="font-semibold text-sm">{symbol}</span>
+        <span className="text-xs text-muted-foreground">{name}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <TrendIndicator value={changePercent} />
+        <span className={cn(
+          "text-sm font-mono font-semibold",
+          changePercent >= 0 ? "text-success" : "text-destructive"
+        )}>
+          {formatPercent(changePercent)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function SessionMovementCard({ 
   commodities,
   goldData,
@@ -270,106 +290,89 @@ function SessionMovementCard({
   const gold = commodities.find(c => c.id === 'gold');
   const silver = commodities.find(c => c.id === 'silver');
 
-  // Session insights based on which markets are open
-  const getSessionInsight = () => {
-    if (chinaStatus.isOpen && !usStatus.isOpen) {
-      return {
-        title: "After China Market Opening",
-        subtitle: "Asian session in progress, US markets closed",
-        icon: "🇨🇳"
-      };
-    } else if (usStatus.isOpen && !chinaStatus.isOpen) {
-      return {
-        title: "After US Market Opening", 
-        subtitle: "US session in progress, China markets closed",
-        icon: "🇺🇸"
-      };
-    } else if (chinaStatus.isOpen && usStatus.isOpen) {
-      return {
-        title: "China & US Markets Overlap",
-        subtitle: "Both major markets currently active",
-        icon: "🌍"
-      };
-    } else {
-      return {
-        title: "Markets Transition Period",
-        subtitle: "Between major trading sessions",
-        icon: "🌙"
-      };
-    }
-  };
-
-  const sessionInfo = getSessionInsight();
-
   const assets = [
-    { id: 'gold', name: 'Gold', symbol: 'XAU', data: gold, changePercent: goldData?.comex.changePercent ?? gold?.changePercent ?? 0 },
-    { id: 'silver', name: 'Silver', symbol: 'XAG', data: silver, changePercent: silverData?.comex.changePercent ?? silver?.changePercent ?? 0 },
-    { id: 'btc', name: 'Bitcoin', symbol: 'BTC', data: btc, changePercent: btc?.changePercent ?? 0 },
-    { id: 'eth', name: 'Ethereum', symbol: 'ETH', data: eth, changePercent: eth?.changePercent ?? 0 },
+    { id: 'gold', name: 'Gold', symbol: 'XAU', changePercent: goldData?.comex.changePercent ?? gold?.changePercent ?? 0 },
+    { id: 'silver', name: 'Silver', symbol: 'XAG', changePercent: silverData?.comex.changePercent ?? silver?.changePercent ?? 0 },
+    { id: 'btc', name: 'Bitcoin', symbol: 'BTC', changePercent: btc?.changePercent ?? 0 },
+    { id: 'eth', name: 'Ethereum', symbol: 'ETH', changePercent: eth?.changePercent ?? 0 },
   ];
 
   return (
-    <Card className="bg-card/50">
-      <CardHeader className="pb-2 pt-4 px-4">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <span className="text-lg">{sessionInfo.icon}</span>
-          <div>
-            <div>{sessionInfo.title}</div>
-            <div className="text-xs font-normal text-muted-foreground">{sessionInfo.subtitle}</div>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 pt-0 space-y-2">
-        {assets.map(asset => (
-          <div key={asset.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+    <div className="space-y-4">
+      {/* After China Market Opening */}
+      <Card className={cn(
+        "bg-card/50 border-l-4",
+        chinaStatus.isOpen ? "border-l-amber-500" : "border-l-muted"
+      )}>
+        <CardHeader className="pb-2 pt-3 px-4">
+          <CardTitle className="text-sm flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm">{asset.symbol}</span>
-              <span className="text-xs text-muted-foreground">{asset.name}</span>
+              <span className="text-lg">🇨🇳</span>
+              <span>After China Market Opening</span>
             </div>
-            <div className="flex items-center gap-2">
-              <TrendIndicator value={asset.changePercent} />
-              <span className={cn(
-                "text-sm font-mono font-semibold",
-                asset.changePercent >= 0 ? "text-success" : "text-destructive"
-              )}>
-                {formatPercent(asset.changePercent)}
-              </span>
-            </div>
+            {chinaStatus.isOpen ? (
+              <Badge className="bg-amber-500 text-white text-xs">LIVE</Badge>
+            ) : (
+              <Badge variant="secondary" className="text-xs">
+                {chinaStatus.nextEvent}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
+          <div className="space-y-1">
+            {assets.map(asset => (
+              <AssetRow key={`china-${asset.id}`} {...asset} />
+            ))}
           </div>
-        ))}
-        
-        <div className="pt-3 space-y-2 text-xs">
           {chinaStatus.isOpen && (
-            <div className="flex items-center gap-2 p-2 rounded bg-amber-500/10 border border-amber-500/20">
-              <span>🇨🇳</span>
-              <span className="text-amber-600 dark:text-amber-400">
-                China market open for {chinaStatus.hoursOpen?.toFixed(1)}h — {chinaStatus.nextEvent}
-              </span>
+            <div className="mt-3 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              Open for {chinaStatus.hoursOpen?.toFixed(1)}h — {chinaStatus.nextEvent}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* After US Market Opening */}
+      <Card className={cn(
+        "bg-card/50 border-l-4",
+        usStatus.isOpen ? "border-l-blue-500" : "border-l-muted"
+      )}>
+        <CardHeader className="pb-2 pt-3 px-4">
+          <CardTitle className="text-sm flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🇺🇸</span>
+              <span>After US Market Opening</span>
+            </div>
+            {usStatus.isOpen ? (
+              <Badge className="bg-blue-500 text-white text-xs">LIVE</Badge>
+            ) : (
+              <Badge variant="secondary" className="text-xs">
+                {usStatus.nextEvent}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
+          <div className="space-y-1">
+            {assets.map(asset => (
+              <AssetRow key={`us-${asset.id}`} {...asset} />
+            ))}
+          </div>
           {usStatus.isOpen && (
-            <div className="flex items-center gap-2 p-2 rounded bg-blue-500/10 border border-blue-500/20">
-              <span>🇺🇸</span>
-              <span className="text-blue-600 dark:text-blue-400">
-                US market open for {usStatus.hoursOpen?.toFixed(1)}h — {usStatus.nextEvent}
-              </span>
+            <div className="mt-3 text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              Open for {usStatus.hoursOpen?.toFixed(1)}h — {usStatus.nextEvent}
             </div>
           )}
-          {!chinaStatus.isOpen && !usStatus.isOpen && (
-            <div className="flex items-center gap-2 p-2 rounded bg-muted">
-              <span>🌙</span>
-              <span className="text-muted-foreground">
-                Major markets closed. China {chinaStatus.nextEvent.toLowerCase()}, US {usStatus.nextEvent.toLowerCase()}
-              </span>
-            </div>
-          )}
-        </div>
-        
-        <div className="pt-2 text-[11px] text-muted-foreground">
-          <p>💡 24h change shown. Crypto trades 24/7; metals follow exchange hours.</p>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      <div className="text-[11px] text-muted-foreground">
+        <p>💡 24h change shown. Crypto trades 24/7; metals follow exchange hours.</p>
+      </div>
+    </div>
   );
 }
 
