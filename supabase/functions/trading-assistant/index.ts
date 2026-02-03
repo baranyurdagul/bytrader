@@ -1,9 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const MAX_MESSAGES = 20; // Limit conversation history to prevent abuse
+const MAX_MESSAGE_LENGTH = 2000; // Limit individual message length
 
 const BASE_SYSTEM_PROMPT = `You are an expert trading assistant specializing in commodities (Gold, Silver, Copper) and cryptocurrencies (Bitcoin, Ethereum). You provide:
 
@@ -55,7 +59,54 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authentication - require user to be logged in
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required. Please log in to use the trading assistant." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify the user's JWT token
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error("Auth validation failed:", claimsError);
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired session. Please log in again." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log(`Trading assistant request from user: ${userId}`);
+
     const { messages, portfolio } = await req.json();
+    
+    // Validate input
+    if (!Array.isArray(messages)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid request: messages must be an array" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Limit messages array to prevent abuse
+    const truncatedMessages = messages.slice(-MAX_MESSAGES).map((msg: any) => ({
+      role: msg.role === 'user' || msg.role === 'assistant' ? msg.role : 'user',
+      content: typeof msg.content === 'string' 
+        ? msg.content.slice(0, MAX_MESSAGE_LENGTH) 
+        : '',
+    }));
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -74,7 +125,7 @@ serve(async (req) => {
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          ...messages,
+          ...truncatedMessages,
         ],
         stream: true,
       }),
