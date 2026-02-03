@@ -16,10 +16,16 @@ interface HistoricalPrice {
 const historyCache: Map<string, { data: HistoricalPrice[], timestamp: number }> = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// Yahoo Finance tickers
+// Price bounds for validation (spot prices, not futures)
+const PRICE_BOUNDS: Record<string, { min: number; max: number }> = {
+  gold: { min: 1500, max: 8000 },
+  silver: { min: 15, max: 100 },
+};
+
+// Yahoo Finance tickers - using spot/ETF proxies for more accurate historical data
 const YAHOO_TICKERS: Record<string, string> = {
   gold: 'GC=F',
-  silver: 'SI=F',
+  silver: 'SLV',  // Use SLV ETF for historical - futures contracts cause price jumps
   nasdaq100: '^NDX',
   sp500: '^GSPC',
   vym: 'VYM',
@@ -28,8 +34,11 @@ const YAHOO_TICKERS: Record<string, string> = {
   slv: 'SLV',
 };
 
+// SLV ETF to spot silver conversion (1 share ≈ 0.93 oz of silver)
+const SLV_TO_SPOT_RATIO = 1 / 0.93;
+
 // Fetch historical data from Yahoo Finance
-async function fetchYahooHistory(ticker: string, days: number, interval: string = '1d'): Promise<HistoricalPrice[]> {
+async function fetchYahooHistory(ticker: string, days: number, interval: string = '1d', assetId?: string): Promise<HistoricalPrice[]> {
   const cacheKey = `${ticker}-${days}-${interval}`;
   const cached = historyCache.get(cacheKey);
   
@@ -71,16 +80,32 @@ async function fetchYahooHistory(ticker: string, days: number, interval: string 
     const timestamps = result.timestamp;
     const quote = result.indicators.quote[0];
     
+    // Determine if this is an ETF that needs conversion to spot price
+    const isSilverETF = ticker === 'SLV' && assetId === 'silver';
+    const conversionRatio = isSilverETF ? SLV_TO_SPOT_RATIO : 1;
+    
     const history: HistoricalPrice[] = [];
+    const bounds = assetId ? PRICE_BOUNDS[assetId] : null;
     
     for (let i = 0; i < timestamps.length; i++) {
       if (quote.close[i] != null) {
+        const rawClose = quote.close[i] * conversionRatio;
+        const rawOpen = (quote.open[i] || quote.close[i]) * conversionRatio;
+        const rawHigh = (quote.high[i] || quote.close[i]) * conversionRatio;
+        const rawLow = (quote.low[i] || quote.close[i]) * conversionRatio;
+        
+        // Validate price is within bounds if bounds exist
+        if (bounds && (rawClose < bounds.min || rawClose > bounds.max)) {
+          console.warn(`Skipping out-of-bounds price for ${assetId}: $${rawClose.toFixed(2)}`);
+          continue;
+        }
+        
         history.push({
           timestamp: timestamps[i] * 1000,
-          open: quote.open[i] || quote.close[i],
-          high: quote.high[i] || quote.close[i],
-          low: quote.low[i] || quote.close[i],
-          close: quote.close[i],
+          open: rawOpen,
+          high: rawHigh,
+          low: rawLow,
+          close: rawClose,
           volume: quote.volume[i] || 0,
         });
       }
@@ -178,7 +203,7 @@ async function fetchHistoryByCategory(assetId: string, category: string, days: n
   
   const ticker = YAHOO_TICKERS[assetId];
   if (ticker) {
-    return fetchYahooHistory(ticker, days, interval);
+    return fetchYahooHistory(ticker, days, interval, assetId);
   }
   
   console.error(`Unknown asset: ${assetId}`);
