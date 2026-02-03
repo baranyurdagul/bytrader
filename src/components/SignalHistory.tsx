@@ -1,11 +1,23 @@
+import { useState, useMemo } from 'react';
 import { Signal, PricePoint } from '@/lib/tradingData';
 import { cn } from '@/lib/utils';
 import { ArrowUpCircle, ArrowDownCircle, MinusCircle, Clock, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+type TimeRange = '1D' | '1W' | '1M' | '3M' | '1Y';
+
+const TIME_RANGES: { label: string; value: TimeRange; days: number }[] = [
+  { label: '1D', value: '1D', days: 1 },
+  { label: '1W', value: '1W', days: 7 },
+  { label: '1M', value: '1M', days: 30 },
+  { label: '3M', value: '3M', days: 90 },
+  { label: '1Y', value: '1Y', days: 365 },
+];
 
 interface SignalHistoryProps {
   commodityName: string;
@@ -194,7 +206,23 @@ function generateHistoricalSignalsFromData(
 }
 
 export function SignalHistory({ commodityName, priceHistory }: SignalHistoryProps) {
-  const historicalSignals = generateHistoricalSignalsFromData(commodityName, priceHistory || []);
+  const [selectedRange, setSelectedRange] = useState<TimeRange>('1W');
+  
+  // Filter price history based on selected time range
+  const filteredPriceHistory = useMemo(() => {
+    if (!priceHistory || priceHistory.length === 0) return [];
+    
+    const selectedDays = TIME_RANGES.find(r => r.value === selectedRange)?.days || 7;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - selectedDays);
+    
+    return priceHistory.filter(point => new Date(point.timestamp) >= cutoffDate);
+  }, [priceHistory, selectedRange]);
+  
+  const historicalSignals = useMemo(() => 
+    generateHistoricalSignalsFromData(commodityName, filteredPriceHistory),
+    [commodityName, filteredPriceHistory]
+  );
   
   return (
     <div className="glass-card rounded-xl p-5">
@@ -203,18 +231,39 @@ export function SignalHistory({ commodityName, priceHistory }: SignalHistoryProp
           <Clock className="w-4 h-4 text-primary" />
           <h3 className="font-semibold text-foreground">Recent Signals</h3>
         </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button className="text-muted-foreground hover:text-primary transition-colors">
-              <Info className="w-4 h-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="max-w-[250px]">
-            <p className="text-xs">
-              Signals are calculated from real historical price data using RSI, MACD, and moving average analysis.
-            </p>
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex items-center gap-2">
+          {/* Time Range Selector */}
+          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+            {TIME_RANGES.map((range) => (
+              <Button
+                key={range.value}
+                variant={selectedRange === range.value ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-6 px-2 text-xs font-medium transition-all",
+                  selectedRange === range.value 
+                    ? "bg-primary text-primary-foreground shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setSelectedRange(range.value)}
+              >
+                {range.label}
+              </Button>
+            ))}
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button className="text-muted-foreground hover:text-primary transition-colors">
+                <Info className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="max-w-[250px]">
+              <p className="text-xs">
+                Signals are calculated from real historical price data using RSI, MACD, and moving average analysis.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
       
       <div className="space-y-3">
