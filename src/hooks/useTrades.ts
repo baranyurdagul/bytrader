@@ -150,6 +150,65 @@ export function useTrades() {
     }
   }, [fetchTrades, toast]);
 
+  const updateTrade = useCallback(async (tradeId: string, updates: Partial<Trade>) => {
+    try {
+      const { error } = await supabase
+        .from('trades')
+        .update(updates)
+        .eq('id', tradeId);
+
+      if (error) throw error;
+
+      await fetchTrades();
+      
+      toast({
+        title: "Trade Updated",
+        description: "Trade has been successfully updated",
+      });
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error updating trade:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update trade",
+        variant: "destructive",
+      });
+      return { error };
+    }
+  }, [fetchTrades, toast]);
+
+  const deleteTradesByAsset = useCallback(async (assetId: string) => {
+    if (!user) return { error: new Error('Not authenticated') };
+
+    try {
+      const { error } = await supabase
+        .from('trades')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('asset_id', assetId);
+
+      if (error) throw error;
+
+      await fetchTrades();
+      
+      toast({
+        title: "Position Deleted",
+        description: "All trades for this asset have been removed",
+      });
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error deleting position:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete position",
+        variant: "destructive",
+      });
+      return { error };
+    }
+  }, [user, fetchTrades, toast]);
+
   // Calculate portfolio positions from trades
   const calculatePositions = useCallback((currentPrices: Record<string, number>): PortfolioPosition[] => {
     const positionsMap: Record<string, {
@@ -229,6 +288,8 @@ export function useTrades() {
     isLoading,
     addTrade,
     deleteTrade,
+    updateTrade,
+    deleteTradesByAsset,
     refetch: fetchTrades,
     calculatePositions,
     calculatePortfolioStats,

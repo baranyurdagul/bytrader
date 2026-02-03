@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { AddTradeDialog } from '@/components/AddTradeDialog';
+import { EditTradeDialog } from '@/components/EditTradeDialog';
+import { PositionTradesDialog } from '@/components/PositionTradesDialog';
 import { PortfolioCharts } from '@/components/PortfolioCharts';
 import { useAuth } from '@/hooks/useAuth';
-import { useTrades, Trade } from '@/hooks/useTrades';
+import { useTrades, Trade, PortfolioPosition } from '@/hooks/useTrades';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { getCommodityData, formatPrice } from '@/lib/tradingData';
 import { Button } from '@/components/ui/button';
@@ -16,6 +18,7 @@ import {
   ArrowUpCircle, 
   ArrowDownCircle,
   Trash2,
+  Pencil,
   Loader2,
   LogIn
 } from 'lucide-react';
@@ -25,7 +28,13 @@ const Portfolio = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { commodities: liveCommodities } = useLivePrices(60000);
-  const { trades, isLoading: tradesLoading, addTrade, deleteTrade, calculatePortfolioStats } = useTrades();
+  const { trades, isLoading: tradesLoading, addTrade, deleteTrade, updateTrade, deleteTradesByAsset, calculatePortfolioStats } = useTrades();
+
+  // State for dialogs
+  const [selectedPosition, setSelectedPosition] = useState<PortfolioPosition | null>(null);
+  const [positionDialogOpen, setPositionDialogOpen] = useState(false);
+  const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const commodities = liveCommodities.length > 0 ? liveCommodities : getCommodityData();
 
@@ -167,21 +176,28 @@ const Portfolio = () => {
                 {portfolioStats.positions.map((position) => (
                   <div 
                     key={position.asset_id}
-                    className="p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                    className="p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer group"
+                    onClick={() => {
+                      setSelectedPosition(position);
+                      setPositionDialogOpen(true);
+                    }}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h3 className="font-semibold text-foreground">{position.asset_name}</h3>
                         <p className="text-sm text-muted-foreground">{position.asset_symbol}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-mono font-semibold">${formatPrice(position.currentValue)}</p>
-                        <p className={cn(
-                          "text-sm font-mono",
-                          position.profitLoss >= 0 ? "text-success" : "text-destructive"
-                        )}>
-                          {position.profitLoss >= 0 ? '+' : ''}{position.profitLossPercent.toFixed(2)}%
-                        </p>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <p className="font-mono font-semibold">${formatPrice(position.currentValue)}</p>
+                          <p className={cn(
+                            "text-sm font-mono",
+                            position.profitLoss >= 0 ? "text-success" : "text-destructive"
+                          )}>
+                            {position.profitLoss >= 0 ? '+' : ''}{position.profitLossPercent.toFixed(2)}%
+                          </p>
+                        </div>
+                        <Pencil className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-sm">
@@ -226,18 +242,56 @@ const Portfolio = () => {
             ) : (
               <div className="space-y-2 max-h-[400px] overflow-y-auto scrollbar-thin pr-2">
                 {trades.slice(0, 20).map((trade) => (
-                  <TradeRow key={trade.id} trade={trade} onDelete={deleteTrade} />
+                  <TradeRow 
+                    key={trade.id} 
+                    trade={trade} 
+                    onDelete={deleteTrade}
+                    onEdit={(trade) => {
+                      setEditingTrade(trade);
+                      setEditDialogOpen(true);
+                    }}
+                  />
                 ))}
               </div>
             )}
           </div>
         </div>
+
+        {/* Position Trades Dialog */}
+        <PositionTradesDialog
+          position={selectedPosition}
+          trades={trades}
+          open={positionDialogOpen}
+          onOpenChange={setPositionDialogOpen}
+          onDeleteTrade={deleteTrade}
+          onEditTrade={(trade) => {
+            setEditingTrade(trade);
+            setEditDialogOpen(true);
+          }}
+          onDeletePosition={deleteTradesByAsset}
+        />
+
+        {/* Edit Trade Dialog */}
+        <EditTradeDialog
+          trade={editingTrade}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onUpdateTrade={updateTrade}
+        />
       </main>
     </Layout>
   );
 };
 
-function TradeRow({ trade, onDelete }: { trade: Trade; onDelete: (id: string) => Promise<any> }) {
+function TradeRow({ 
+  trade, 
+  onDelete, 
+  onEdit 
+}: { 
+  trade: Trade; 
+  onDelete: (id: string) => Promise<any>;
+  onEdit: (trade: Trade) => void;
+}) {
   const isBuy = trade.trade_type === 'BUY';
   
   return (
@@ -269,13 +323,21 @@ function TradeRow({ trade, onDelete }: { trade: Trade; onDelete: (id: string) =>
         </div>
       </div>
       
-      <div className="flex items-center gap-3">
-        <div className="text-right">
+      <div className="flex items-center gap-2">
+        <div className="text-right mr-1">
           <p className="text-sm font-mono font-semibold">${formatPrice(Number(trade.total_value))}</p>
           <p className="text-xs text-muted-foreground">
             {new Date(trade.trade_date).toLocaleDateString()}
           </p>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+          onClick={() => onEdit(trade)}
+        >
+          <Pencil className="w-4 h-4 text-muted-foreground" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"
