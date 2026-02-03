@@ -16,10 +16,12 @@ interface HistoricalPrice {
 const historyCache: Map<string, { data: HistoricalPrice[], timestamp: number }> = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// Price bounds for validation (spot prices, not futures)
+// Price bounds for validation (updated for 2026 market conditions)
+// Silver rallied from ~$25/oz in 2024 to ~$75-80/oz in early 2026
+// Gold rallied from ~$2000/oz in 2024 to ~$4600/oz in early 2026
 const PRICE_BOUNDS: Record<string, { min: number; max: number }> = {
-  gold: { min: 1500, max: 8000 },
-  silver: { min: 15, max: 100 },
+  gold: { min: 1500, max: 10000 },
+  silver: { min: 15, max: 150 },
 };
 
 // Yahoo Finance tickers - using spot/ETF proxies for more accurate historical data
@@ -79,6 +81,11 @@ async function fetchYahooHistory(ticker: string, days: number, interval: string 
     
     const timestamps = result.timestamp;
     const quote = result.indicators.quote[0];
+    
+    // Log the date range being returned
+    const firstDate = new Date(timestamps[0] * 1000).toISOString();
+    const lastDate = new Date(timestamps[timestamps.length - 1] * 1000).toISOString();
+    console.log(`Yahoo returned data for ${ticker}: ${firstDate} to ${lastDate} (${timestamps.length} points)`);
     
     // Determine if this is an ETF that needs conversion to spot price
     const isSilverETF = ticker === 'SLV' && assetId === 'silver';
