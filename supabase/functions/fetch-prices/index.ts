@@ -53,12 +53,12 @@ const YAHOO_TICKERS = {
 // SI=F = Silver Futures (COMEX) - directly gives silver price per oz
 
 // Sanity bounds for metal prices (to catch obviously wrong API data)
-// These are broad bounds to allow for price increases over time
-// Silver: normal range ~$20-50, but can spike to ~$100 in extreme conditions
-// Gold: normal range ~$1800-3500, but futures can show higher premiums
+// Updated for 2026 market conditions where silver/gold have rallied significantly
+// Silver: rallied from ~$25/oz to ~$75-80/oz in early 2026
+// Gold: rallied from ~$2000/oz to ~$4600/oz in early 2026
 const PRICE_BOUNDS = {
-  gold: { min: 1500, max: 8000 },  // Realistic gold range per oz (with premium buffer)
-  silver: { min: 15, max: 100 },   // Realistic silver range per oz (with spike buffer)
+  gold: { min: 1500, max: 10000 },  // Extended for 2026 gold rally
+  silver: { min: 15, max: 150 },    // Extended for 2026 silver rally
 };
 
 // Fetch quote from Yahoo Finance
