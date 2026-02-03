@@ -1,5 +1,5 @@
 // Version for deployment verification - update on each deploy
-const VERSION = "v2.1.0";
+const VERSION = "v2.2.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,6 +52,15 @@ const YAHOO_TICKERS = {
 // GC=F = Gold Futures (COMEX) - directly gives gold price per oz
 // SI=F = Silver Futures (COMEX) - directly gives silver price per oz
 
+// Sanity bounds for metal prices (to catch obviously wrong API data)
+// These are broad bounds to allow for price increases over time
+// Silver: normal range ~$20-50, but can spike to ~$100 in extreme conditions
+// Gold: normal range ~$1800-3500, but futures can show higher premiums
+const PRICE_BOUNDS = {
+  gold: { min: 1500, max: 8000 },  // Realistic gold range per oz (with premium buffer)
+  silver: { min: 15, max: 100 },   // Realistic silver range per oz (with spike buffer)
+};
+
 // Fetch quote from Yahoo Finance
 async function fetchYahooQuote(ticker: string): Promise<any | null> {
   try {
@@ -94,21 +103,33 @@ async function fetchYahooQuote(ticker: string): Promise<any | null> {
   }
 }
 
+// Validate price is within realistic bounds
+function validateMetalPrice(metal: 'gold' | 'silver', price: number): boolean {
+  const bounds = PRICE_BOUNDS[metal];
+  if (price < bounds.min || price > bounds.max) {
+    console.warn(`${metal} price $${price} is outside realistic bounds ($${bounds.min}-$${bounds.max}). Rejecting.`);
+    return false;
+  }
+  return true;
+}
+
 // Fetch metal prices directly from futures contracts
 // GC=F = Gold Futures, SI=F = Silver Futures (directly in USD per oz)
+// Falls back to deriving from ETFs if futures data is unreliable
 async function fetchMetalPrices(): Promise<PriceData[]> {
   console.log('Fetching metal prices from futures contracts (GC=F, SI=F)...');
   
-  const [goldQuote, silverQuote] = await Promise.all([
+  const [goldQuote, silverQuote, slvQuote] = await Promise.all([
     fetchYahooQuote('GC=F'),  // Gold Futures
     fetchYahooQuote('SI=F'),  // Silver Futures
+    fetchYahooQuote('SLV'),   // SLV ETF as backup for silver (1 share ≈ ~0.93 oz silver)
   ]);
   
   const results: PriceData[] = [];
   const now = new Date().toISOString();
   
   // Gold price directly from futures
-  if (goldQuote?.price) {
+  if (goldQuote?.price && validateMetalPrice('gold', goldQuote.price)) {
     const goldSpot = goldQuote.price;
     const prevGoldSpot = goldQuote.previousClose || goldSpot;
     const change = goldSpot - prevGoldSpot;
@@ -133,38 +154,56 @@ async function fetchMetalPrices(): Promise<PriceData[]> {
     priceCache.set('gold', { ...priceData, lastUpdated: now });
     console.log(`Gold (GC=F futures): $${goldSpot.toFixed(2)}/oz`);
   } else {
+    console.warn('Gold price rejected or unavailable, using cache');
     const cached = priceCache.get('gold');
     if (cached) {
       results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
     }
   }
   
-  // Silver price directly from futures
-  if (silverQuote?.price) {
-    const silverSpot = silverQuote.price;
-    const prevSilverSpot = silverQuote.previousClose || silverSpot;
-    const change = silverSpot - prevSilverSpot;
+  // Silver price - try futures first, fall back to SLV ETF derivation
+  let silverPrice: number | null = null;
+  let silverPrevClose: number | null = null;
+  let silverSource = 'SI=F';
+  
+  // Check if futures price is valid
+  if (silverQuote?.price && validateMetalPrice('silver', silverQuote.price)) {
+    silverPrice = silverQuote.price;
+    silverPrevClose = silverQuote.previousClose || silverPrice;
+    console.log(`Silver (SI=F futures): $${silverPrice!.toFixed(2)}/oz`);
+  } else if (slvQuote?.price) {
+    // SLV ETF: 1 share ≈ 0.93 oz of silver (this ratio varies slightly over time)
+    // This is an approximation but gives a realistic spot price
+    const SLV_OZ_PER_SHARE = 0.93;
+    silverPrice = slvQuote.price / SLV_OZ_PER_SHARE;
+    silverPrevClose = slvQuote.previousClose ? slvQuote.previousClose / SLV_OZ_PER_SHARE : silverPrice;
+    silverSource = 'SLV';
+    console.log(`Silver (derived from SLV ETF): $${silverPrice!.toFixed(2)}/oz (SLV price: $${slvQuote.price})`);
+  }
+  
+  if (silverPrice !== null && validateMetalPrice('silver', silverPrice)) {
+    const change = silverPrice - (silverPrevClose || silverPrice);
     
     const priceData: PriceData = {
       id: 'silver',
       name: 'Silver',
       symbol: 'XAG/USD',
       category: 'metal',
-      price: Math.round(silverSpot * 100) / 100,
+      price: Math.round(silverPrice * 100) / 100,
       priceUnit: '/oz',
       change: Math.round(change * 100) / 100,
-      changePercent: prevSilverSpot ? (change / prevSilverSpot) * 100 : 0,
-      high24h: silverQuote.high || silverSpot,
-      low24h: silverQuote.low || silverSpot,
-      volume: formatVolume(silverQuote.volume || 89000),
+      changePercent: silverPrevClose ? (change / silverPrevClose) * 100 : 0,
+      high24h: silverQuote?.high || silverPrice,
+      low24h: silverQuote?.low || silverPrice,
+      volume: formatVolume(silverQuote?.volume || 89000),
       marketCap: '$1.4T',
       lastUpdated: now,
       dataSource: 'live',
     };
     results.push(priceData);
     priceCache.set('silver', { ...priceData, lastUpdated: now });
-    console.log(`Silver (SI=F futures): $${silverSpot.toFixed(2)}/oz`);
   } else {
+    console.warn(`Silver price from ${silverSource} rejected or unavailable, using cache`);
     const cached = priceCache.get('silver');
     if (cached) {
       results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
