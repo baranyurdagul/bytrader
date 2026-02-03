@@ -74,11 +74,13 @@ function generateHistoricalSignalsFromData(
     }];
   }
   
-  // Generate signals at different historical points (every ~4 hours worth of data)
-  const dataPointsPerSignal = Math.max(1, Math.floor(priceHistory.length / 5));
+  // Use last 5 data points with meaningful intervals
+  const totalPoints = priceHistory.length;
+  const signalCount = Math.min(5, Math.floor(totalPoints / 4));
+  const step = Math.max(1, Math.floor(totalPoints / signalCount));
   
-  for (let i = 0; i < 5; i++) {
-    const endIdx = priceHistory.length - (i * dataPointsPerSignal);
+  for (let i = 0; i < signalCount; i++) {
+    const endIdx = totalPoints - (i * step);
     if (endIdx < 20) break;
     
     const historicalSlice = priceHistory.slice(0, endIdx);
@@ -261,7 +263,7 @@ export function SignalHistory({ commodityName, priceHistory }: SignalHistoryProp
                   {signal.confidence}%
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {signal.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {signal.timestamp.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                 </p>
               </div>
             </div>
