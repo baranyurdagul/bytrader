@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 
 export default function Assistant() {
   const { messages, isLoading, error, sendMessage, clearMessages, updatePortfolioContext } = useStreamingChat();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { trades, calculatePortfolioStats } = useTrades();
   const { commodities } = useLivePrices();
   const [input, setInput] = useState('');
@@ -75,6 +75,40 @@ export default function Assistant() {
     setInput('');
     await sendMessage(messageText);
   };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-4 h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] flex items-center justify-center">
+          <div className="text-center text-muted-foreground">
+            <Bot className="w-12 h-12 mx-auto mb-3 animate-pulse" />
+            <p className="text-sm">Loading...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Require authentication to use the assistant
+  if (!user) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-4 h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] flex items-center justify-center">
+          <div className="text-center">
+            <Bot className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">Login Required</h2>
+            <p className="text-muted-foreground mb-4">
+              Please log in to access the AI Trading Assistant.
+            </p>
+            <Button onClick={() => window.location.href = '/auth'}>
+              Log In
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
