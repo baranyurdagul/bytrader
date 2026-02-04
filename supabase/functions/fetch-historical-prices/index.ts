@@ -34,6 +34,7 @@ const YAHOO_TICKERS: Record<string, string> = {
   vymi: 'VYMI',
   gldm: 'GLDM',
   slv: 'SLV',
+  vfqs: 'VFQS.QA', // Vodafone Qatar - Qatar Stock Exchange
 };
 
 // SLV ETF to spot silver conversion (1 share ≈ 0.93 oz of silver)

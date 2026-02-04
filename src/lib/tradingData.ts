@@ -6,7 +6,7 @@ export interface CommodityData {
   id: string;
   name: string;
   symbol: string;
-  category: 'metal' | 'crypto' | 'index' | 'etf';
+  category: 'metal' | 'crypto' | 'index' | 'etf' | 'stock';
   price: number;
   priceUnit: string;
   change: number;
@@ -44,6 +44,7 @@ export function getCategoryIcon(category: string): string {
     case 'crypto': return '₿';
     case 'index': return '📊';
     case 'etf': return '📈';
+    case 'stock': return '🏢';
     default: return '📊';
   }
 }
@@ -54,6 +55,7 @@ export function getCategoryLabel(category: string): string {
     case 'crypto': return 'Cryptocurrency';
     case 'index': return 'Index';
     case 'etf': return 'ETF';
+    case 'stock': return 'Stock';
     default: return category;
   }
 }
