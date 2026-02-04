@@ -13,7 +13,7 @@ interface PriceData {
   id: string;
   name: string;
   symbol: string;
-  category: 'metal' | 'crypto' | 'index' | 'etf';
+  category: 'metal' | 'crypto' | 'index' | 'etf' | 'stock';
   price: number;
   priceUnit: string;
   change: number;
@@ -46,6 +46,8 @@ const YAHOO_TICKERS = {
   vymi: 'VYMI',        // Vanguard International High Dividend Yield ETF
   gldm: 'GLDM',        // SPDR Gold MiniShares Trust
   slv: 'SLV',          // iShares Silver Trust
+  // Stocks
+  vfqs: 'VFQS.QA',     // Vodafone Qatar - Qatar Stock Exchange
 };
 
 // Use futures contracts directly for spot prices
@@ -394,6 +396,48 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
   return results;
 }
 
+// Fetch stock prices from Yahoo Finance
+async function fetchStockPrices(): Promise<PriceData[]> {
+  console.log('Fetching stock prices from Yahoo Finance...');
+  
+  const vfqsQuote = await fetchYahooQuote(YAHOO_TICKERS.vfqs);
+  
+  const results: PriceData[] = [];
+  const now = new Date().toISOString();
+  
+  if (vfqsQuote?.price) {
+    const change = vfqsQuote.price - (vfqsQuote.previousClose || vfqsQuote.price);
+    const priceData: PriceData = {
+      id: 'vfqs',
+      name: 'Vodafone Qatar',
+      symbol: 'VFQS',
+      category: 'stock',
+      price: vfqsQuote.price,
+      priceUnit: ' QAR',
+      change,
+      changePercent: vfqsQuote.previousClose ? (change / vfqsQuote.previousClose) * 100 : 0,
+      high24h: vfqsQuote.high || vfqsQuote.price,
+      low24h: vfqsQuote.low || vfqsQuote.price,
+      volume: formatVolume(vfqsQuote.volume || 500000),
+      marketCap: '$1.8B',
+      lastUpdated: now,
+      dataSource: 'live',
+    };
+    results.push(priceData);
+    priceCache.set('vfqs', { ...priceData, lastUpdated: now });
+    console.log(`Vodafone Qatar (VFQS.QA): ${vfqsQuote.price} QAR`);
+  } else {
+    console.warn('Vodafone Qatar price unavailable, checking cache');
+    const cached = priceCache.get('vfqs');
+    if (cached) {
+      results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
+    }
+  }
+  
+  console.log(`Fetched ${results.filter(r => r.dataSource === 'live').length} live stock prices`);
+  return results;
+}
+
 function formatVolume(volume: number): string {
   if (volume >= 1e9) return `${(volume / 1e9).toFixed(1)}B`;
   if (volume >= 1e6) return `${(volume / 1e6).toFixed(1)}M`;
@@ -420,14 +464,15 @@ Deno.serve(async (req) => {
     console.log(`[${VERSION}] Fetching live prices from Yahoo Finance + CoinGecko...`);
     
     // Fetch all prices in parallel
-    const [metals, etfs, cryptos, indices] = await Promise.all([
+    const [metals, etfs, cryptos, indices, stocks] = await Promise.all([
       fetchMetalPrices(),
       fetchETFPrices(),
       fetchCryptoPrices(),
       fetchIndicesPrices(),
+      fetchStockPrices(),
     ]);
     
-    const allPrices = [...metals, ...cryptos, ...indices, ...etfs];
+    const allPrices = [...metals, ...cryptos, ...indices, ...etfs, ...stocks];
     
     const liveCount = allPrices.filter(p => p.dataSource === 'live').length;
     const cachedCount = allPrices.filter(p => p.dataSource === 'cached').length;

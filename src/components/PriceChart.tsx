@@ -10,7 +10,7 @@ interface PriceChartProps {
   priceHistory: PricePoint[];
   indicators: TechnicalIndicatorsType;
   commodityId: string;
-  category?: 'metal' | 'crypto' | 'index' | 'etf';
+  category?: 'metal' | 'crypto' | 'index' | 'etf' | 'stock';
 }
 
 type TimeRange = '1D' | '1W' | '1M' | '3M' | '1Y';
