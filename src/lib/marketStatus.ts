@@ -21,6 +21,13 @@ const MARKET_SCHEDULES: Record<string, MarketSchedule> = {
     timezone: 'America/New_York',
     label: 'US Market',
   },
+  china: {
+    days: [1, 2, 3, 4, 5], // Mon-Fri
+    openHour: 9, openMinute: 0,
+    closeHour: 15, closeMinute: 0,
+    timezone: 'Asia/Shanghai',
+    label: 'China Market',
+  },
   qatar: {
     days: [0, 1, 2, 3, 4], // Sun-Thu
     openHour: 9, openMinute: 30,
@@ -102,4 +109,18 @@ export function getAssetMarketStatus(category: CategoryType, assetId?: string): 
 // Check if ANY non-crypto market is open (for the header indicator)
 export function isAnyMarketOpen(): boolean {
   return Object.values(MARKET_SCHEDULES).some(s => isScheduleOpen(s));
+}
+
+// Get COMEX (US) market status
+export function getComexMarketStatus(): MarketStatusInfo {
+  const schedule = MARKET_SCHEDULES.us;
+  const open = isScheduleOpen(schedule);
+  return { isOpen: open, label: open ? 'Open' : 'Closed' };
+}
+
+// Get SGE (Shanghai) market status
+export function getSgeMarketStatus(): MarketStatusInfo {
+  const schedule = MARKET_SCHEDULES.china;
+  const open = isScheduleOpen(schedule);
+  return { isOpen: open, label: open ? 'Open' : 'Closed' };
 }

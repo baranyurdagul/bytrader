@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getComexMarketStatus, getSgeMarketStatus } from '@/lib/marketStatus';
 
 export function ArbitrageSpreadTile() {
   const navigate = useNavigate();
@@ -76,6 +77,16 @@ export function ArbitrageSpreadTile() {
 
   const isCached = goldData?.dataSource === 'cached' || silverData?.dataSource === 'cached';
 
+  const comexStatus = getComexMarketStatus();
+  const sgeStatus = getSgeMarketStatus();
+
+  const StatusDot = ({ isOpen }: { isOpen: boolean }) => (
+    <span className={cn(
+      "inline-block w-1.5 h-1.5 rounded-full flex-shrink-0",
+      isOpen ? "bg-success animate-pulse" : "bg-muted-foreground/40"
+    )} />
+  );
+
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] gap-3">
@@ -108,11 +119,11 @@ export function ArbitrageSpreadTile() {
               
               <div className="space-y-1 text-[10px]">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">COMEX:</span>
+                  <span className="text-muted-foreground flex items-center gap-1"><StatusDot isOpen={comexStatus.isOpen} />COMEX:</span>
                   <span className="font-mono font-medium text-success">{formatPrice(silverData.comex.price)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">SGE:</span>
+                  <span className="text-muted-foreground flex items-center gap-1"><StatusDot isOpen={sgeStatus.isOpen} />SGE:</span>
                   <span className="font-mono font-medium text-success">
                     {silverData.shanghai.priceUSD > 0 ? formatPrice(silverData.shanghai.priceUSD) : '--'}
                   </span>
@@ -156,11 +167,11 @@ export function ArbitrageSpreadTile() {
               
               <div className="space-y-1 text-[10px]">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">COMEX:</span>
+                  <span className="text-muted-foreground flex items-center gap-1"><StatusDot isOpen={comexStatus.isOpen} />COMEX:</span>
                   <span className="font-mono font-medium text-success">{formatPrice(goldData.comex.price)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">SGE:</span>
+                  <span className="text-muted-foreground flex items-center gap-1"><StatusDot isOpen={sgeStatus.isOpen} />SGE:</span>
                   <span className="font-mono font-medium text-success">
                     {goldData.shanghai.priceUSD > 0 ? formatPrice(goldData.shanghai.priceUSD) : '--'}
                   </span>
