@@ -59,7 +59,7 @@ export default function Arbitrage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-between p-4 max-w-lg mx-auto">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -85,7 +85,7 @@ export default function Arbitrage() {
         </div>
       </div>
       
-      <div className="p-4 space-y-4 pb-24">
+      <div className="p-4 space-y-4 pb-24 max-w-lg mx-auto">
         {/* Current Spreads */}
         <div className="grid grid-cols-2 gap-3">
           {/* Gold Current */}
