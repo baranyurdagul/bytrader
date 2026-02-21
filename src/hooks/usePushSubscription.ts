@@ -45,7 +45,7 @@ export function usePushSubscription() {
 
     try {
       // Get service worker registration
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.ready as ServiceWorkerRegistration & { pushManager: PushManager };
       
       // Check for existing subscription
       let pushSubscription = await registration.pushManager.getSubscription();
@@ -102,7 +102,7 @@ export function usePushSubscription() {
     if (!user) return false;
 
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.ready as ServiceWorkerRegistration & { pushManager: PushManager };
       const pushSubscription = await registration.pushManager.getSubscription();
 
       if (pushSubscription) {
@@ -128,7 +128,7 @@ export function usePushSubscription() {
 
   const checkSubscription = useCallback(async (): Promise<boolean> => {
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.ready as ServiceWorkerRegistration & { pushManager: PushManager };
       const pushSubscription = await registration.pushManager.getSubscription();
       setSubscription(pushSubscription);
       return !!pushSubscription;
