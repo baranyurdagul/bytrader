@@ -55,7 +55,10 @@ export function ArbitrageSpreadTile() {
     );
   }
 
-  const formatPrice = (price: number) => `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatPrice = (price: number) => {
+    if (price >= 1000) return `$${Math.round(price).toLocaleString()}`;
+    return `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
   const getSpreadIcon = (direction: string) => {
     if (direction === 'premium') return TrendingUp;
@@ -89,10 +92,10 @@ export function ArbitrageSpreadTile() {
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] gap-3">
+      <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] gap-1.5">
         {/* Silver Section */}
         <div 
-          className="glass-card rounded-xl p-3 space-y-2 cursor-pointer transition-all hover:shadow-md active:scale-[0.98]"
+          className="glass-card rounded-xl p-2.5 space-y-2 cursor-pointer transition-all hover:shadow-md active:scale-[0.98] min-w-0"
           onClick={() => navigate('/arbitrage')}
         >
           <div className="flex items-center gap-1.5">
@@ -140,7 +143,7 @@ export function ArbitrageSpreadTile() {
         
         {/* Gold Section */}
         <div 
-          className="glass-card rounded-xl p-3 space-y-2 cursor-pointer transition-all hover:shadow-md active:scale-[0.98]"
+          className="glass-card rounded-xl p-2.5 space-y-2 cursor-pointer transition-all hover:shadow-md active:scale-[0.98] min-w-0"
           onClick={() => navigate('/arbitrage')}
         >
           <div className="flex items-center gap-1.5">
@@ -188,7 +191,7 @@ export function ArbitrageSpreadTile() {
         
         {/* Gold:Silver Ratio */}
         <div 
-          className="glass-card rounded-xl p-3 space-y-2 cursor-pointer transition-all hover:shadow-md active:scale-[0.98]"
+          className="glass-card rounded-xl p-2.5 space-y-2 cursor-pointer transition-all hover:shadow-md active:scale-[0.98] min-w-0"
           onClick={() => navigate('/arbitrage')}
         >
           <div className="flex items-center gap-1.5">
