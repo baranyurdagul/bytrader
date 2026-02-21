@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { isAnyMarketOpen } from '@/lib/marketStatus';
 
 // Frontend app version - update this when deploying new versions
-const APP_VERSION = "v2.2.0";
+const APP_VERSION = "v2.3.0";
 
 export function Header() {
   const location = useLocation();
