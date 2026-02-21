@@ -74,7 +74,7 @@ function getMarketForCategory(category: CategoryType, assetId?: string): string 
     case 'etf':
       return 'us';
     case 'stock':
-      if (assetId === 'vfqs') return 'qatar';
+      if (assetId === 'vfqs' || assetId === 'ords') return 'qatar';
       return 'us';
     default:
       return null;

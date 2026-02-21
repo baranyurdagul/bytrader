@@ -44,6 +44,7 @@ export function CompactAssetRow({
       case 'vymi': return 'bg-gradient-to-br from-violet-500 to-purple-600';
       case 'gldm': return 'gradient-gold';
       case 'slv': return 'gradient-silver';
+      case 'ords': return 'bg-gradient-to-br from-red-600 to-orange-500';
       default: return 'bg-gradient-to-br from-gray-500 to-gray-600';
     }
   };

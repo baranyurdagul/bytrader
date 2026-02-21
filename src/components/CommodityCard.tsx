@@ -56,6 +56,7 @@ export function CommodityCard({
       case 'vymi': return 'bg-gradient-to-br from-violet-500 to-purple-600';
       case 'gldm': return 'gradient-gold';
       case 'slv': return 'gradient-silver';
+      case 'ords': return 'bg-gradient-to-br from-red-600 to-orange-500';
       default: return 'bg-gradient-to-br from-gray-500 to-gray-600';
     }
   };
@@ -73,6 +74,7 @@ export function CommodityCard({
       case 'vymi': return 'hover:shadow-[0_0_40px_-10px_hsl(270_80%_60%/0.4)]';
       case 'gldm': return 'hover:shadow-[0_0_40px_-10px_hsl(43_96%_56%/0.4)]';
       case 'slv': return 'hover:shadow-[0_0_40px_-10px_hsl(220_10%_75%/0.4)]';
+      case 'ords': return 'hover:shadow-[0_0_40px_-10px_hsl(15_80%_55%/0.4)]';
       default: return '';
     }
   };
