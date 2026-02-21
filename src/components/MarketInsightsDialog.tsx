@@ -17,21 +17,25 @@ import { useSilverSpread, SilverSpreadData } from '@/hooks/useSilverSpread';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { cn } from '@/lib/utils';
 
-// Market session times (UTC) - approximate main trading hours
+// Market session config with timezone-aware scheduling
 const MARKET_SESSIONS = {
   china: { 
-    open: 1.5, // 9:30 AM CST = 1:30 UTC
-    close: 7.5, // 3:30 PM CST = 7:30 UTC  
+    days: [1, 2, 3, 4, 5], // Mon-Fri
+    openHour: 9, openMinute: 30,
+    closeHour: 15, closeMinute: 30,
     label: 'China Market',
     flag: '🇨🇳',
-    timezone: 'CST (UTC+8)'
+    timezone: 'Asia/Shanghai',
+    timezoneLabel: 'CST (UTC+8)'
   },
   us: { 
-    open: 14.5, // 9:30 AM EST = 14:30 UTC
-    close: 21, // 4:00 PM EST = 21:00 UTC
+    days: [1, 2, 3, 4, 5], // Mon-Fri
+    openHour: 9, openMinute: 30,
+    closeHour: 16, closeMinute: 0,
     label: 'US Market',
     flag: '🇺🇸',
-    timezone: 'EST (UTC-5)'
+    timezone: 'America/New_York',
+    timezoneLabel: 'EST (UTC-5)'
   },
 };
 
@@ -44,39 +48,68 @@ interface MarketStatus {
   hoursOpen?: number;
 }
 
-function getMarketStatus(market: 'china' | 'us'): MarketStatus {
+function getLocalTime(timezone: string): { day: number; hour: number; minute: number } {
   const now = new Date();
-  const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    weekday: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(now);
+
+  const weekdayStr = parts.find(p => p.type === 'weekday')?.value || '';
+  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+
+  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const day = dayMap[weekdayStr] ?? now.getDay();
+
+  return { day, hour: hour === 24 ? 0 : hour, minute };
+}
+
+function getMarketStatus(market: 'china' | 'us'): MarketStatus {
   const session = MARKET_SESSIONS[market];
+  const { day, hour, minute } = getLocalTime(session.timezone);
   
-  const isOpen = utcHour >= session.open && utcHour < session.close;
+  const currentMinutes = hour * 60 + minute;
+  const openMinutes = session.openHour * 60 + session.openMinute;
+  const closeMinutes = session.closeHour * 60 + session.closeMinute;
   
-  // Calculate next event
+  // Check if it's a trading day AND within trading hours
+  const isTradingDay = session.days.includes(day);
+  const isWithinHours = currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+  const isOpen = isTradingDay && isWithinHours;
+  
   let nextEvent = '';
   let hoursOpen = 0;
   
   if (isOpen) {
-    hoursOpen = utcHour - session.open;
-    const hoursToClose = session.close - utcHour;
-    if (hoursToClose < 1) {
-      nextEvent = `Closes in ${Math.round(hoursToClose * 60)}m`;
+    hoursOpen = (currentMinutes - openMinutes) / 60;
+    const minutesToClose = closeMinutes - currentMinutes;
+    if (minutesToClose < 60) {
+      nextEvent = `Closes in ${minutesToClose}m`;
     } else {
-      nextEvent = `Closes in ${Math.floor(hoursToClose)}h ${Math.round((hoursToClose % 1) * 60)}m`;
+      nextEvent = `Closes in ${Math.floor(minutesToClose / 60)}h ${minutesToClose % 60}m`;
+    }
+  } else if (!isTradingDay) {
+    nextEvent = 'Closed (Weekend)';
+  } else if (currentMinutes < openMinutes) {
+    const minutesToOpen = openMinutes - currentMinutes;
+    if (minutesToOpen < 60) {
+      nextEvent = `Opens in ${minutesToOpen}m`;
+    } else {
+      nextEvent = `Opens in ${Math.floor(minutesToOpen / 60)}h`;
     }
   } else {
-    let hoursToOpen = session.open - utcHour;
-    if (hoursToOpen < 0) hoursToOpen += 24;
-    if (hoursToOpen < 1) {
-      nextEvent = `Opens in ${Math.round(hoursToOpen * 60)}m`;
-    } else {
-      nextEvent = `Opens in ${Math.floor(hoursToOpen)}h`;
-    }
+    nextEvent = 'Opens next trading day';
   }
   
-  // Get local time for that market
-  const localTime = market === 'china' 
-    ? now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: true })
-    : now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: true });
+  const now = new Date();
+  const localTime = now.toLocaleString('en-US', { 
+    timeZone: session.timezone, 
+    hour: '2-digit', minute: '2-digit', hour12: true 
+  });
   
   return { isOpen, label: session.label, flag: session.flag, nextEvent, localTime, hoursOpen };
 }
