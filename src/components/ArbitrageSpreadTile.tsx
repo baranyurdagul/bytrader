@@ -4,11 +4,14 @@ import { TrendingUp, TrendingDown, Minus, ChevronRight, Clock } from 'lucide-rea
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export function ArbitrageSpreadTile() {
   const navigate = useNavigate();
   const { data: goldData, isLoading: goldLoading, refetch: refetchGold } = useGoldSpread(60000);
   const { data: silverData, isLoading: silverLoading, refetch: refetchSilver } = useSilverSpread(60000);
+  const [wowChange, setWowChange] = useState<number | null>(null);
 
   const isLoading = (goldLoading && !goldData) || (silverLoading && !silverData);
 
@@ -16,6 +19,33 @@ export function ArbitrageSpreadTile() {
     refetchGold();
     refetchSilver();
   };
+
+  // Fetch WoW ratio change from snapshots
+  useEffect(() => {
+    async function fetchWoW() {
+      try {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const weekAgoStr = weekAgo.toISOString().split('T')[0];
+        
+        const { data } = await supabase
+          .from('arbitrage_snapshots')
+          .select('gold_comex_price, silver_comex_price, snapshot_date')
+          .lte('snapshot_date', weekAgoStr)
+          .order('snapshot_date', { ascending: false })
+          .limit(1);
+        
+        if (data && data.length > 0 && goldData && silverData) {
+          const oldRatio = data[0].gold_comex_price / data[0].silver_comex_price;
+          const currentRatio = goldData.comex.price / silverData.comex.price;
+          setWowChange(((currentRatio - oldRatio) / oldRatio) * 100);
+        }
+      } catch (err) {
+        console.error('Error fetching WoW ratio:', err);
+      }
+    }
+    if (goldData && silverData) fetchWoW();
+  }, [goldData, silverData]);
 
   if (isLoading) {
     return (
@@ -90,6 +120,51 @@ export function ArbitrageSpreadTile() {
       {/* Content Grid - Gold & Silver Side by Side */}
       <div className="p-4">
         <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] gap-3">
+          {/* Silver Section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Silver</span>
+            </div>
+            
+            {silverData ? (
+              <>
+                <div className={cn("p-2 rounded-lg border", getBgColor(silverData.spread.direction))}>
+                  <div className="flex items-center gap-1 mb-1">
+                    {(() => {
+                      const Icon = getSpreadIcon(silverData.spread.direction);
+                      return <Icon className={cn("w-3 h-3", getSpreadColor(silverData.spread.direction))} />;
+                    })()}
+                    <span className={cn("text-lg font-bold font-mono", getSpreadColor(silverData.spread.direction))}>
+                      {silverData.spread.percent >= 0 ? '+' : ''}{silverData.spread.percent.toFixed(2)}%
+                    </span>
+                  </div>
+                  <p className={cn("text-[10px] font-mono", getSpreadColor(silverData.spread.direction))}>
+                    {silverData.spread.value >= 0 ? '+' : ''}{formatPrice(silverData.spread.value)}
+                  </p>
+                </div>
+                
+                <div className="space-y-1.5 text-[10px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">COMEX:</span>
+                    <span className="font-mono font-medium text-success">{formatPrice(silverData.comex.price)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Shanghai:</span>
+                    <span className="font-mono font-medium text-success">
+                      {silverData.shanghai.priceUSD > 0 ? formatPrice(silverData.shanghai.priceUSD) : '--'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">Data unavailable</p>
+            )}
+          </div>
+          
+          {/* Separator */}
+          <div className="w-px bg-border/50 self-stretch" />
+          
           {/* Gold Section */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -153,57 +228,17 @@ export function ArbitrageSpreadTile() {
                 
                 <div className="space-y-1.5 text-[10px]">
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Gold:</span>
-                    <span className="font-mono font-medium text-foreground">{formatPrice(goldData.comex.price)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Silver:</span>
-                    <span className="font-mono font-medium text-foreground">{formatPrice(silverData.comex.price)}</span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">Data unavailable</p>
-            )}
-          </div>
-          
-          {/* Separator */}
-          <div className="w-px bg-border/50 self-stretch" />
-          
-          {/* Silver Section */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-slate-400" />
-              <span className="text-xs font-semibold text-foreground">Silver</span>
-            </div>
-            
-            {silverData ? (
-              <>
-                <div className={cn("p-2 rounded-lg border", getBgColor(silverData.spread.direction))}>
-                  <div className="flex items-center gap-1 mb-1">
-                    {(() => {
-                      const Icon = getSpreadIcon(silverData.spread.direction);
-                      return <Icon className={cn("w-3 h-3", getSpreadColor(silverData.spread.direction))} />;
-                    })()}
-                    <span className={cn("text-lg font-bold font-mono", getSpreadColor(silverData.spread.direction))}>
-                      {silverData.spread.percent >= 0 ? '+' : ''}{silverData.spread.percent.toFixed(2)}%
-                    </span>
-                  </div>
-                  <p className={cn("text-[10px] font-mono", getSpreadColor(silverData.spread.direction))}>
-                    {silverData.spread.value >= 0 ? '+' : ''}{formatPrice(silverData.spread.value)}
-                  </p>
-                </div>
-                
-                <div className="space-y-1.5 text-[10px]">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">COMEX:</span>
-                    <span className="font-mono font-medium text-success">{formatPrice(silverData.comex.price)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Shanghai:</span>
-                    <span className="font-mono font-medium text-success">
-                      {silverData.shanghai.priceUSD > 0 ? formatPrice(silverData.shanghai.priceUSD) : '--'}
-                    </span>
+                    <span className="text-muted-foreground">WoW:</span>
+                    {wowChange !== null ? (
+                      <span className={cn(
+                        "font-mono font-medium",
+                        wowChange >= 0 ? "text-success" : "text-destructive"
+                      )}>
+                        {wowChange >= 0 ? '+' : ''}{wowChange.toFixed(2)}%
+                      </span>
+                    ) : (
+                      <span className="font-mono font-medium text-muted-foreground">N/A</span>
+                    )}
                   </div>
                 </div>
               </>
