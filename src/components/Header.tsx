@@ -18,6 +18,7 @@ import { FloatingTicker } from '@/components/FloatingTicker';
 import { useLivePrices } from '@/hooks/useLivePrices';
 import { getCommodityData } from '@/lib/tradingData';
 import { Badge } from '@/components/ui/badge';
+import { isAnyMarketOpen } from '@/lib/marketStatus';
 
 // Frontend app version - update this when deploying new versions
 const APP_VERSION = "v2.2.0";
@@ -163,10 +164,17 @@ export function Header() {
               {APP_VERSION}
             </Badge>
             
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/20">
-              <Activity className="w-4 h-4 text-success animate-pulse" />
-              <span className="text-xs font-medium text-success">Markets Open</span>
-            </div>
+            {isAnyMarketOpen() ? (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-success/10 border border-success/20">
+                <Activity className="w-4 h-4 text-success animate-pulse" />
+                <span className="text-xs font-medium text-success">Markets Open</span>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted border border-border">
+                <Activity className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Markets Closed</span>
+              </div>
+            )}
             
             {/* Market Insights Button */}
             <MarketInsightsDialog />

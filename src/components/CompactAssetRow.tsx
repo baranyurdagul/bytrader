@@ -1,6 +1,7 @@
 import { CommodityData, formatPrice } from '@/lib/tradingData';
 import { TrendingUp, TrendingDown, Minus, Star, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getAssetMarketStatus } from '@/lib/marketStatus';
 
 export type PriceUnit = 'oz' | 'gram';
 export const OZ_TO_GRAM = 31.1035;
@@ -77,7 +78,22 @@ export function CompactAssetRow({
             <WifiOff className="w-3 h-3 text-muted-foreground shrink-0" />
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{commodity.symbol}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs text-muted-foreground">{commodity.symbol}</p>
+          {(() => {
+            const status = getAssetMarketStatus(commodity.category, commodity.id);
+            return (
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0",
+                status.isOpen
+                  ? "bg-success/15 text-success"
+                  : "bg-destructive/15 text-destructive"
+              )}>
+                {status.label}
+              </span>
+            );
+          })()}
+        </div>
       </div>
 
       {/* Price */}

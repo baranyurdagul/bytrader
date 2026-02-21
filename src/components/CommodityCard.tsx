@@ -2,6 +2,7 @@ import { CommodityData, formatPrice, formatChange, getCategoryIcon, getCategoryL
 import { TrendingUp, TrendingDown, Minus, Star, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { getAssetMarketStatus } from '@/lib/marketStatus';
 
 export type PriceUnit = 'oz' | 'gram';
 
@@ -115,6 +116,19 @@ export function CommodityCard({
               <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 {getCategoryLabel(commodity.category)}
               </span>
+              {(() => {
+                const status = getAssetMarketStatus(commodity.category, commodity.id);
+                return (
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.5 rounded font-medium",
+                    status.isOpen
+                      ? "bg-success/15 text-success"
+                      : "bg-destructive/15 text-destructive"
+                  )}>
+                    {status.label}
+                  </span>
+                );
+              })()}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className={cn(
