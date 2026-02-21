@@ -48,6 +48,7 @@ const YAHOO_TICKERS = {
   slv: 'SLV',          // iShares Silver Trust
   // Stocks
   vfqs: 'VFQS.QA',     // Vodafone Qatar - Qatar Stock Exchange
+  ords: 'ORDS.QA',     // Ooredoo Qatar - Qatar Stock Exchange
 };
 
 // Use futures contracts directly for spot prices
@@ -400,37 +401,47 @@ async function fetchIndicesPrices(): Promise<PriceData[]> {
 async function fetchStockPrices(): Promise<PriceData[]> {
   console.log('Fetching stock prices from Yahoo Finance...');
   
-  const vfqsQuote = await fetchYahooQuote(YAHOO_TICKERS.vfqs);
+  const [vfqsQuote, ordsQuote] = await Promise.all([
+    fetchYahooQuote(YAHOO_TICKERS.vfqs),
+    fetchYahooQuote(YAHOO_TICKERS.ords),
+  ]);
   
   const results: PriceData[] = [];
   const now = new Date().toISOString();
   
-  if (vfqsQuote?.price) {
-    const change = vfqsQuote.price - (vfqsQuote.previousClose || vfqsQuote.price);
-    const priceData: PriceData = {
-      id: 'vfqs',
-      name: 'Vodafone Qatar',
-      symbol: 'VFQS',
-      category: 'stock',
-      price: vfqsQuote.price,
-      priceUnit: ' QAR',
-      change,
-      changePercent: vfqsQuote.previousClose ? (change / vfqsQuote.previousClose) * 100 : 0,
-      high24h: vfqsQuote.high || vfqsQuote.price,
-      low24h: vfqsQuote.low || vfqsQuote.price,
-      volume: formatVolume(vfqsQuote.volume || 500000),
-      marketCap: '$1.8B',
-      lastUpdated: now,
-      dataSource: 'live',
-    };
-    results.push(priceData);
-    priceCache.set('vfqs', { ...priceData, lastUpdated: now });
-    console.log(`Vodafone Qatar (VFQS.QA): ${vfqsQuote.price} QAR`);
-  } else {
-    console.warn('Vodafone Qatar price unavailable, checking cache');
-    const cached = priceCache.get('vfqs');
-    if (cached) {
-      results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
+  const stockConfigs = [
+    { quote: vfqsQuote, id: 'vfqs', name: 'Vodafone Qatar', symbol: 'VFQS', marketCap: '$1.8B' },
+    { quote: ordsQuote, id: 'ords', name: 'Ooredoo Qatar', symbol: 'ORDS', marketCap: '$3.2B' },
+  ];
+  
+  for (const config of stockConfigs) {
+    if (config.quote?.price) {
+      const change = config.quote.price - (config.quote.previousClose || config.quote.price);
+      const priceData: PriceData = {
+        id: config.id,
+        name: config.name,
+        symbol: config.symbol,
+        category: 'stock',
+        price: config.quote.price,
+        priceUnit: ' QAR',
+        change,
+        changePercent: config.quote.previousClose ? (change / config.quote.previousClose) * 100 : 0,
+        high24h: config.quote.high || config.quote.price,
+        low24h: config.quote.low || config.quote.price,
+        volume: formatVolume(config.quote.volume || 500000),
+        marketCap: config.marketCap,
+        lastUpdated: now,
+        dataSource: 'live',
+      };
+      results.push(priceData);
+      priceCache.set(config.id, { ...priceData, lastUpdated: now });
+      console.log(`${config.name} (${config.symbol}): ${config.quote.price} QAR`);
+    } else {
+      console.warn(`${config.name} price unavailable, checking cache`);
+      const cached = priceCache.get(config.id);
+      if (cached) {
+        results.push({ ...cached, dataSource: 'cached', lastUpdated: now });
+      }
     }
   }
   
