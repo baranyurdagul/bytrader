@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, TrendingUp, TrendingDown, Info } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,14 +46,32 @@ export default function Arbitrage() {
   
   const formatPrice = (price: number) => `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   
+  // Enrich history data with Au:Ag ratio
+  const chartData = useMemo(() => {
+    return historyData.map(d => ({
+      ...d,
+      goldSilverRatio: d.silverComex > 0 ? d.goldComex / d.silverComex : null,
+    }));
+  }, [historyData]);
+
   // Calculate stats from history
   const goldSpreads = historyData.map(d => d.goldSpreadPercent);
   const silverSpreads = historyData.map(d => d.silverSpreadPercent);
+  const ratios = chartData.filter(d => d.goldSilverRatio !== null).map(d => d.goldSilverRatio as number);
   
   const avgGoldSpread = goldSpreads.length > 0 ? goldSpreads.reduce((a, b) => a + b, 0) / goldSpreads.length : 0;
   const avgSilverSpread = silverSpreads.length > 0 ? silverSpreads.reduce((a, b) => a + b, 0) / silverSpreads.length : 0;
   const maxGoldSpread = goldSpreads.length > 0 ? Math.max(...goldSpreads) : 0;
   const minGoldSpread = goldSpreads.length > 0 ? Math.min(...goldSpreads) : 0;
+  
+  const avgRatio = ratios.length > 0 ? ratios.reduce((a, b) => a + b, 0) / ratios.length : 0;
+  const maxRatio = ratios.length > 0 ? Math.max(...ratios) : 0;
+  const minRatio = ratios.length > 0 ? Math.min(...ratios) : 0;
+  
+  // Current ratio
+  const currentRatio = goldData && silverData && silverData.comex.price > 0 
+    ? goldData.comex.price / silverData.comex.price 
+    : null;
   
   return (
     <div className="min-h-screen bg-background">
@@ -70,8 +88,8 @@ export default function Arbitrage() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-lg font-bold text-foreground">Shanghai Arbitrage</h1>
-              <p className="text-xs text-muted-foreground">COMEX vs Shanghai Premium Trends</p>
+              <h1 className="text-lg font-bold text-foreground">Arbitrage & Ratio</h1>
+              <p className="text-xs text-muted-foreground">Spreads & Gold:Silver Ratio Trends</p>
             </div>
           </div>
           <Button
@@ -86,55 +104,73 @@ export default function Arbitrage() {
       </div>
       
       <div className="p-4 space-y-4 pb-24 max-w-lg mx-auto">
-        {/* Current Spreads */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Gold Current */}
-          <div className="glass-card rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-3 h-3 rounded-full bg-amber-500" />
-              <span className="text-sm font-semibold">Gold</span>
-            </div>
-            {goldData ? (
-              <>
-                <div className={cn(
-                  "text-2xl font-bold font-mono",
-                  goldData.spread.direction === 'premium' ? 'text-success' : 
-                  goldData.spread.direction === 'discount' ? 'text-destructive' : 'text-muted-foreground'
-                )}>
-                  {goldData.spread.percent >= 0 ? '+' : ''}{goldData.spread.percent.toFixed(2)}%
-                </div>
-                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                  <p>COMEX: {formatPrice(goldData.comex.price)}</p>
-                  <p>Shanghai: {goldData.shanghai.priceUSD > 0 ? formatPrice(goldData.shanghai.priceUSD) : '--'}</p>
-                </div>
-              </>
-            ) : (
-              <Skeleton className="h-10 w-24" />
-            )}
-          </div>
-          
+        {/* Current Spreads + Ratio */}
+        <div className="grid grid-cols-3 gap-3">
           {/* Silver Current */}
-          <div className="glass-card rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-3 h-3 rounded-full bg-slate-400" />
-              <span className="text-sm font-semibold">Silver</span>
+          <div className="glass-card rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+              <span className="text-xs font-semibold">Silver</span>
             </div>
             {silverData ? (
               <>
                 <div className={cn(
-                  "text-2xl font-bold font-mono",
+                  "text-xl font-bold font-mono",
                   silverData.spread.direction === 'premium' ? 'text-success' : 
                   silverData.spread.direction === 'discount' ? 'text-destructive' : 'text-muted-foreground'
                 )}>
                   {silverData.spread.percent >= 0 ? '+' : ''}{silverData.spread.percent.toFixed(2)}%
                 </div>
-                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                <div className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
                   <p>COMEX: {formatPrice(silverData.comex.price)}</p>
-                  <p>Shanghai: {silverData.shanghai.priceUSD > 0 ? formatPrice(silverData.shanghai.priceUSD) : '--'}</p>
+                  <p>SGE: {silverData.shanghai.priceUSD > 0 ? formatPrice(silverData.shanghai.priceUSD) : '--'}</p>
                 </div>
               </>
             ) : (
-              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-20" />
+            )}
+          </div>
+          
+          {/* Gold Current */}
+          <div className="glass-card rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              <span className="text-xs font-semibold">Gold</span>
+            </div>
+            {goldData ? (
+              <>
+                <div className={cn(
+                  "text-xl font-bold font-mono",
+                  goldData.spread.direction === 'premium' ? 'text-success' : 
+                  goldData.spread.direction === 'discount' ? 'text-destructive' : 'text-muted-foreground'
+                )}>
+                  {goldData.spread.percent >= 0 ? '+' : ''}{goldData.spread.percent.toFixed(2)}%
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
+                  <p>COMEX: {formatPrice(goldData.comex.price)}</p>
+                  <p>SGE: {goldData.shanghai.priceUSD > 0 ? formatPrice(goldData.shanghai.priceUSD) : '--'}</p>
+                </div>
+              </>
+            ) : (
+              <Skeleton className="h-10 w-20" />
+            )}
+          </div>
+          
+          {/* Au:Ag Ratio */}
+          <div className="glass-card rounded-xl p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-amber-500 to-slate-400" />
+              <span className="text-xs font-semibold">Au:Ag</span>
+            </div>
+            {currentRatio !== null ? (
+              <>
+                <div className="text-xl font-bold font-mono text-foreground">
+                  {currentRatio.toFixed(1)}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">ratio</p>
+              </>
+            ) : (
+              <Skeleton className="h-10 w-20" />
             )}
           </div>
         </div>
@@ -148,7 +184,7 @@ export default function Arbitrage() {
           </TabsList>
         </Tabs>
         
-        {/* Chart */}
+        {/* Spread Chart */}
         <div className="glass-card rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold">Spread Trend</h2>
@@ -158,19 +194,19 @@ export default function Arbitrage() {
           </div>
           
           {isLoading ? (
-            <div className="h-64 flex items-center justify-center">
+            <div className="h-56 flex items-center justify-center">
               <Skeleton className="h-full w-full" />
             </div>
           ) : error ? (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">
+            <div className="h-56 flex items-center justify-center text-muted-foreground">
               <p>{error}</p>
             </div>
           ) : historyData.length === 0 ? (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">
+            <div className="h-56 flex items-center justify-center text-muted-foreground">
               <p>No data available</p>
             </div>
           ) : (
-            <div className="h-64">
+            <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={historyData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
@@ -227,26 +263,89 @@ export default function Arbitrage() {
           )}
         </div>
         
+        {/* Au:Ag Ratio Chart */}
+        <div className="glass-card rounded-xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold">Gold:Silver Ratio Trend</h2>
+          </div>
+          
+          {isLoading ? (
+            <div className="h-48 flex items-center justify-center">
+              <Skeleton className="h-full w-full" />
+            </div>
+          ) : chartData.filter(d => d.goldSilverRatio !== null).length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-muted-foreground">
+              <p>No ratio data available</p>
+            </div>
+          ) : (
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis 
+                    dataKey="timestamp" 
+                    tickFormatter={formatDate}
+                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tickLine={false}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                    labelFormatter={(timestamp) => new Date(timestamp).toLocaleDateString()}
+                    formatter={(value: number) => [value.toFixed(1), 'Au:Ag Ratio']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="goldSilverRatio"
+                    stroke="hsl(30, 80%, 55%)"
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+        
         {/* Statistics */}
         <div className="glass-card rounded-xl p-4">
           <h2 className="text-sm font-semibold mb-3">Period Statistics</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Avg Gold Premium</p>
+              <p className="text-xs text-muted-foreground mb-1">Avg Gold Prem.</p>
               <p className={cn(
-                "text-lg font-bold font-mono",
+                "text-base font-bold font-mono",
                 avgGoldSpread > 0 ? 'text-success' : 'text-destructive'
               )}>
                 {avgGoldSpread >= 0 ? '+' : ''}{avgGoldSpread.toFixed(2)}%
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Avg Silver Premium</p>
+              <p className="text-xs text-muted-foreground mb-1">Avg Silver Prem.</p>
               <p className={cn(
-                "text-lg font-bold font-mono",
+                "text-base font-bold font-mono",
                 avgSilverSpread > 0 ? 'text-success' : 'text-destructive'
               )}>
                 {avgSilverSpread >= 0 ? '+' : ''}{avgSilverSpread.toFixed(2)}%
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Avg Au:Ag</p>
+              <p className="text-base font-bold font-mono text-foreground">
+                {avgRatio > 0 ? avgRatio.toFixed(1) : '--'}
               </p>
             </div>
             <div>
@@ -256,6 +355,12 @@ export default function Arbitrage() {
             <div>
               <p className="text-xs text-muted-foreground mb-1">Gold Low</p>
               <p className="text-sm font-mono text-destructive">{minGoldSpread >= 0 ? '+' : ''}{minGoldSpread.toFixed(2)}%</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Ratio Range</p>
+              <p className="text-sm font-mono text-foreground">
+                {minRatio > 0 ? `${minRatio.toFixed(1)}-${maxRatio.toFixed(1)}` : '--'}
+              </p>
             </div>
           </div>
         </div>
