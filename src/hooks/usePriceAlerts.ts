@@ -335,10 +335,47 @@ export function usePriceAlerts() {
     }
   }, [toast, isSupported, permissionState, requestPermission]);
 
+  const updateAlert = useCallback(async (alertId: string, updates: { target_price: number; condition: 'above' | 'below' }) => {
+    try {
+      const { error } = await supabase
+        .from('price_alerts')
+        .update({
+          target_price: updates.target_price,
+          condition: updates.condition,
+          is_triggered: false,
+          triggered_at: null,
+          triggered_price: null,
+          is_active: true,
+        })
+        .eq('id', alertId);
+
+      if (error) throw error;
+
+      await fetchAlerts();
+      notifiedAlertsRef.current.delete(alertId);
+
+      toast({
+        title: "Alert Updated",
+        description: `Alert has been updated successfully`,
+      });
+
+      return { error: null };
+    } catch (error) {
+      console.error('Error updating alert:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update alert",
+        variant: "destructive",
+      });
+      return { error };
+    }
+  }, [fetchAlerts, toast]);
+
   return {
     alerts,
     isLoading,
     addAlert,
+    updateAlert,
     deleteAlert,
     toggleAlert,
     checkAlerts,
