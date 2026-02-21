@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { useServiceWorker } from '@/hooks/useServiceWorker';
 import { usePushSubscription } from '@/hooks/usePushSubscription';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -152,6 +154,8 @@ function PushNotificationSection({
 }
 
 export function NotificationSettings() {
+  const [isSendingDigest, setIsSendingDigest] = useState(false);
+  const { user } = useAuth();
   const { 
     preferences, 
     isLoading, 
@@ -161,6 +165,27 @@ export function NotificationSettings() {
     togglePushEnabled,
     toggleQuietHours
   } = useNotificationPreferences();
+
+  const handleTestDigest = async () => {
+    if (!user) return;
+    setIsSendingDigest(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-digest-email', {
+        body: { testMode: true, userId: user.id },
+      });
+      if (error) throw error;
+      if (data?.emailsSent?.length > 0) {
+        toast.success('Test digest email sent!');
+      } else {
+        toast.error('No digest sent. Make sure email digest is enabled in your preferences.');
+      }
+    } catch (error) {
+      console.error('Error sending test digest:', error);
+      toast.error('Failed to send test digest email');
+    } finally {
+      setIsSendingDigest(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -253,12 +278,30 @@ export function NotificationSettings() {
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+                )}
 
-        <Separator />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestDigest}
+                  disabled={isSendingDigest}
+                  className="gap-2 w-full"
+                >
+                  {isSendingDigest ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  Send Test Digest
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Note: Test emails are sent to your account email via the default sender domain.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <Separator />
 
         {/* Push Notifications */}
         <PushNotificationSection 
