@@ -89,7 +89,7 @@ export function ArbitrageSpreadTile() {
       
       {/* Content Grid - Gold & Silver Side by Side */}
       <div className="p-4">
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-4">
+        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] gap-3">
           {/* Gold Section */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -99,7 +99,6 @@ export function ArbitrageSpreadTile() {
             
             {goldData ? (
               <>
-                {/* Spread */}
                 <div className={cn("p-2 rounded-lg border", getBgColor(goldData.spread.direction))}>
                   <div className="flex items-center gap-1 mb-1">
                     {(() => {
@@ -115,7 +114,6 @@ export function ArbitrageSpreadTile() {
                   </p>
                 </div>
                 
-                {/* Prices */}
                 <div className="space-y-1.5 text-[10px]">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">COMEX:</span>
@@ -137,6 +135,41 @@ export function ArbitrageSpreadTile() {
           {/* Separator */}
           <div className="w-px bg-border/50 self-stretch" />
           
+          {/* Gold:Silver Ratio */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-500 to-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Au:Ag</span>
+            </div>
+            
+            {goldData && silverData && goldData.comex.price > 0 && silverData.comex.price > 0 ? (
+              <>
+                <div className="p-2 rounded-lg border bg-primary/5 border-primary/20">
+                  <span className="text-lg font-bold font-mono text-foreground">
+                    {(goldData.comex.price / silverData.comex.price).toFixed(1)}
+                  </span>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">ratio</p>
+                </div>
+                
+                <div className="space-y-1.5 text-[10px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Gold:</span>
+                    <span className="font-mono font-medium text-foreground">{formatPrice(goldData.comex.price)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Silver:</span>
+                    <span className="font-mono font-medium text-foreground">{formatPrice(silverData.comex.price)}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">Data unavailable</p>
+            )}
+          </div>
+          
+          {/* Separator */}
+          <div className="w-px bg-border/50 self-stretch" />
+          
           {/* Silver Section */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -146,7 +179,6 @@ export function ArbitrageSpreadTile() {
             
             {silverData ? (
               <>
-                {/* Spread */}
                 <div className={cn("p-2 rounded-lg border", getBgColor(silverData.spread.direction))}>
                   <div className="flex items-center gap-1 mb-1">
                     {(() => {
@@ -162,7 +194,6 @@ export function ArbitrageSpreadTile() {
                   </p>
                 </div>
                 
-                {/* Prices */}
                 <div className="space-y-1.5 text-[10px]">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">COMEX:</span>
