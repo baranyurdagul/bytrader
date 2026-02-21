@@ -25,6 +25,7 @@ const Index = () => {
   const { 
     alerts, 
     addAlert, 
+    updateAlert,
     deleteAlert, 
     toggleAlert, 
     checkAlerts,
@@ -212,6 +213,7 @@ const Index = () => {
               alerts={alerts}
               onDelete={deleteAlert}
               onToggle={toggleAlert}
+              onUpdate={updateAlert}
               currentPrices={currentPrices}
             />
           </div>

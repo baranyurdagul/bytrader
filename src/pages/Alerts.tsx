@@ -42,6 +42,7 @@ export default function Alerts() {
     alerts, 
     isLoading: alertsLoading, 
     addAlert, 
+    updateAlert,
     deleteAlert, 
     toggleAlert,
     checkAlerts,
@@ -287,6 +288,7 @@ export default function Alerts() {
                     alerts={alerts}
                     onDelete={deleteAlert}
                     onToggle={toggleAlert}
+                    onUpdate={updateAlert}
                     currentPrices={currentPrices}
                   />
                 </TabsContent>
@@ -296,6 +298,7 @@ export default function Alerts() {
                     alerts={activeAlerts}
                     onDelete={deleteAlert}
                     onToggle={toggleAlert}
+                    onUpdate={updateAlert}
                     currentPrices={currentPrices}
                   />
                 </TabsContent>
@@ -305,6 +308,7 @@ export default function Alerts() {
                     alerts={triggeredAlerts}
                     onDelete={deleteAlert}
                     onToggle={toggleAlert}
+                    onUpdate={updateAlert}
                     currentPrices={currentPrices}
                   />
                 </TabsContent>
@@ -314,6 +318,7 @@ export default function Alerts() {
                     alerts={pausedAlerts}
                     onDelete={deleteAlert}
                     onToggle={toggleAlert}
+                    onUpdate={updateAlert}
                     currentPrices={currentPrices}
                   />
                 </TabsContent>
