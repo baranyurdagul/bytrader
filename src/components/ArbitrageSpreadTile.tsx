@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getComexMarketStatus, getSgeMarketStatus, getTimeUntilOpen } from '@/lib/marketStatus';
+import { getComexMarketStatus, getSgeMarketStatus } from '@/lib/marketStatus';
 
 export function ArbitrageSpreadTile() {
   const navigate = useNavigate();
@@ -82,27 +82,12 @@ export function ArbitrageSpreadTile() {
 
   const comexStatus = getComexMarketStatus();
   const sgeStatus = getSgeMarketStatus();
-  const comexCountdown = comexStatus.isOpen ? 'Open' : getTimeUntilOpen('us');
-  const sgeCountdown = sgeStatus.isOpen ? 'Open' : getTimeUntilOpen('china');
 
   const StatusDot = ({ isOpen }: { isOpen: boolean }) => (
     <span className={cn(
       "inline-block w-1.5 h-1.5 rounded-full flex-shrink-0",
       isOpen ? "bg-success animate-pulse" : "bg-muted-foreground/40"
     )} />
-  );
-
-  const MarketCountdown = () => (
-    <div className="flex justify-between text-[9px] text-muted-foreground mt-1 pt-1 border-t border-border/30">
-      <span className="flex items-center gap-0.5">
-        <StatusDot isOpen={comexStatus.isOpen} />
-        US: <span className={cn("font-mono", comexStatus.isOpen && "text-success")}>{comexCountdown}</span>
-      </span>
-      <span className="flex items-center gap-0.5">
-        <StatusDot isOpen={sgeStatus.isOpen} />
-        SGE: <span className={cn("font-mono", sgeStatus.isOpen && "text-success")}>{sgeCountdown}</span>
-      </span>
-    </div>
   );
 
   return (
@@ -147,7 +132,6 @@ export function ArbitrageSpreadTile() {
                   </span>
                 </div>
               </div>
-              <MarketCountdown />
             </>
           ) : (
             <p className="text-xs text-muted-foreground">N/A</p>
@@ -196,7 +180,6 @@ export function ArbitrageSpreadTile() {
                   </span>
                 </div>
               </div>
-              <MarketCountdown />
             </>
           ) : (
             <p className="text-xs text-muted-foreground">N/A</p>
@@ -240,7 +223,6 @@ export function ArbitrageSpreadTile() {
                   )}
                 </div>
               </div>
-              <MarketCountdown />
             </>
           ) : (
             <p className="text-xs text-muted-foreground">N/A</p>
