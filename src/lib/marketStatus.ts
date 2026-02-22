@@ -124,3 +124,51 @@ export function getSgeMarketStatus(): MarketStatusInfo {
   const open = isScheduleOpen(schedule);
   return { isOpen: open, label: open ? 'Open' : 'Closed' };
 }
+
+// Get time until a market opens, returns formatted string like "2h 30m"
+export function getTimeUntilOpen(market: 'us' | 'china'): string | null {
+  const schedule = MARKET_SCHEDULES[market];
+  if (!schedule) return null;
+  if (isScheduleOpen(schedule)) return null; // already open
+
+  const now = new Date();
+  const { day, hour, minute } = getLocalTime(schedule.timezone);
+  const currentMinutes = hour * 60 + minute;
+  const openMinutes = schedule.openHour * 60 + schedule.openMinute;
+
+  // Find next trading day
+  let daysUntil = 0;
+  let checkDay = day;
+  for (let i = 0; i < 7; i++) {
+    if (i === 0 && currentMinutes < openMinutes && schedule.days.includes(checkDay)) {
+      daysUntil = 0;
+      break;
+    }
+    checkDay = (day + i + (i === 0 ? 1 : 0)) % 7;
+    if (i === 0) checkDay = (day + 1) % 7;
+    if (schedule.days.includes(checkDay)) {
+      daysUntil = i + 1;
+      break;
+    }
+  }
+
+  // Recalculate properly
+  let minutesUntil: number;
+  if (daysUntil === 0) {
+    minutesUntil = openMinutes - currentMinutes;
+  } else {
+    minutesUntil = (24 * 60 - currentMinutes) + (daysUntil - 1) * 24 * 60 + openMinutes;
+  }
+
+  if (minutesUntil <= 0) minutesUntil += 7 * 24 * 60;
+
+  const hours = Math.floor(minutesUntil / 60);
+  const mins = minutesUntil % 60;
+
+  if (hours >= 24) {
+    const d = Math.floor(hours / 24);
+    const h = hours % 24;
+    return `${d}d ${h}h`;
+  }
+  return `${hours}h ${mins}m`;
+}
